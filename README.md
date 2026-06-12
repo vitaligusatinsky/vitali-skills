@@ -18,6 +18,12 @@ Or drop a skill folder into `~/.claude/skills/` for Claude Code.
 
 ## Skills
 
+### `clip`
+Copy the deliverable from the agent's last response straight to the clipboard —
+strips AI commentary, never re-emits content through the model (shell pipelines
+from the response file to `pbcopy` only). Supports plain-text mode (`/clip clean`)
+and targeted slices (`/clip the SQL query`). Triggers on `/clip`.
+
 ### `condense`
 Validated text shortening to a hard character/byte/word budget. Cuts text to fit a
 limit (e.g. a 4000-char field) **without losing meaning** — preserves intent,
@@ -32,6 +38,17 @@ Pull transcripts from the local MacWhisper SQLite database — find a recording 
 quoted phrase, list recent sessions, fetch a full transcript with timestamps, or
 export to markdown. Triggers on `/macwhisper`, "find the recording where I said X",
 "pull from macwhisper", "which recording was this from".
+
+### `supercharge`
+Audit and upgrade a repo's Claude Code configuration into an integrated,
+token-efficient development system. Inventories always-loaded context weight,
+scores the repo against a playbook (context diet via on-demand rules-library,
+SessionStart git-state guard for parallel sessions, Stop-gate typecheck hooks,
+`.worktreeinclude` worktree readiness, subagent model tiering, footgun-to-hook
+conversion), asks one alignment round, then applies and verifies every change
+(JSON validation, hook smoke-runs, stale-reference greps). Idempotent; adapts
+to the repo's package manager and stack. Triggers on `/supercharge`,
+"tune this repo's Claude config".
 
 ## License
 
