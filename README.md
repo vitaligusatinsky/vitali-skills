@@ -18,6 +18,17 @@ Or drop a skill folder into `~/.claude/skills/` for Claude Code.
 
 ## Skills
 
+### `grounded-analysis`
+Analysis you can trust — of meetings and mentoring sessions, ideas, plans,
+performance, and decisions. Grounds every claim in the source before asserting it,
+separates observation from judgment, labels confidence (`[confirmed]` / `[inferred]`
+/ `[speculative]`), and runs each sharp or critical claim through an adversarial
+self-check before it ships. Built to stop the most common analysis failure: an
+insight-shaped claim, stated as fact, that the evidence doesn't actually support.
+Keeps critiques sharp *and* cited. Adaptive (one-shot for clear asks, frame-first
+when stakes are high); five domain adapters. Triggers on `/analyze`, "give me
+analysis", "what's your read on this".
+
 ### `clip`
 Copy the deliverable from the agent's last response straight to the clipboard —
 strips AI commentary, never re-emits content through the model (shell pipelines
