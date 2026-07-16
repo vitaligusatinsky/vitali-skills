@@ -31,9 +31,9 @@ analysis", "what's your read on this".
 
 ### `clip`
 Copy the deliverable from the agent's last response straight to the clipboard —
-strips AI commentary, never re-emits content through the model (shell pipelines
-from the response file to `pbcopy` only). Supports plain-text mode (`/clip clean`)
-and targeted slices (`/clip the SQL query`). Triggers on `/clip`.
+strips AI commentary and framing, copies the content verbatim (a single heredoc
+to `pbcopy`, no rewording). Supports plain-text mode (`/clip clean`) and
+targeted slices (`/clip the SQL query`). Triggers on `/clip`.
 
 ### `condense`
 Validated text shortening to a hard character/byte/word budget. Cuts text to fit a
