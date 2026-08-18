@@ -1,6 +1,14 @@
 ---
 name: grounded-analysis
-description: Produce analysis you can trust — of meetings and mentoring sessions, ideas, plans, performance, and decisions. Ground every claim in the source before asserting it, separate observation from judgment, label confidence, and run each sharp or critical claim through an adversarial self-check before it ships. Built to stop the most common analysis failure: an insight-shaped claim stated as fact that the evidence doesn't actually support. Use whenever someone asks for "analysis", "your read", "what do you make of this", or a critique of work, a transcript, an idea, a plan, or a decision.
+description: >-
+  Produce analysis you can trust — of meetings and mentoring sessions, ideas,
+  plans, performance, and decisions. Ground every claim in the source before
+  asserting it, separate observation from judgment, label confidence, and run
+  each sharp or critical claim through an adversarial self-check before it
+  ships. Built to stop the most common analysis failure: an insight-shaped
+  claim stated as fact that the evidence doesn't actually support. Use
+  whenever someone asks for "analysis", "your read", "what do you make of
+  this", or a critique of work, a transcript, an idea, a plan, or a decision.
 ---
 
 # Grounded Analysis
