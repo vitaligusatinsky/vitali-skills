@@ -29,9 +29,13 @@ generated artifacts describing a world nobody rechecked, test doubles that no-op
 the semantics they exist to model, jobs scheduled without the flag that lets
 them write, "already exists" treated as fatal so an operation works exactly
 once, and limits nobody has ever measured. Ships `scripts/check-recipes.sh`,
-which runs every detection recipe in the catalogue against a real repo and fails
-if any matches nothing, matches too much, or hangs, because a skill about checks
-that cannot fail has no business shipping one. Every fix is
+which runs every detection recipe against a real repo and fails if any matches
+nothing, matches too much, or hangs, because a skill about checks that cannot
+fail has no business shipping one. Every run ends in a graded report (A to F)
+carrying its own coverage, so a partial audit cannot read as a clean bill of
+health, across four dimensions: the lie families, dead weight and duplication,
+the conventions the repo claims for itself, and whether its tests would have
+failed on the real defect. Every fix is
 aimed at the class, and every new gate has to be proven by breaking the code and
 watching it go red. Triggers on `/antislop`, "audit this repo for dead code",
 "why does this alert never clear", "something broke that every check called fine".

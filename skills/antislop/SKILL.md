@@ -13,10 +13,12 @@ the tests assert the same wrong thing the code does.
 
 ## Do this first
 
-1. **Read `references/patterns.md` in full, before searching anything.** It has
-   all 18 families, the grep for each, and the step that confirms rather than
-   suspects. This page deliberately does not summarise them: a summary is a page
-   treated as the whole set, which is family 7.
+1. **Read the three references, before searching anything.**
+   `references/patterns.md` has the 18 lie families, the grep for each, and the
+   step that confirms rather than suspects. `references/quality.md` has
+   dimensions B, C and D. `references/grading.md` has the report template and
+   the grading rules. This page deliberately does not summarise them: a summary
+   is a page treated as the whole set, which is family 7.
 2. **Say the target and the mode in one line.** Which repo or subsystem, and
    `audit-only` (the default) or `audit-and-fix`. If the user did not say,
    assume audit-only and state that you did.
@@ -46,6 +48,23 @@ Two rules that decide most calls:
 - **Absence of a finding is not evidence of health** unless you know the detector
   could have found one.
 
+## The four dimensions
+
+Every run reports all four, and the grade weights them in this order.
+
+| | Dimension | What it asks |
+|---|---|---|
+| **A** | Honest signals | Do the 18 lie families appear? Heaviest weight |
+| **B** | Dead weight | Unreferenced exports, duplication, dead config and deps |
+| **C** | Conventions | Does the repo follow the rules it states for itself? |
+| **D** | Test integrity | Would the tests have failed on the real defect? |
+
+A is the one nothing else covers, so it is never traded away for the others. A
+repo with tidy conventions and a watchdog that checks nothing is in worse shape
+than a scruffy repo whose signals are honest, and the grade must say so.
+
+B, C and D are in `references/quality.md`.
+
 ## Workflow
 
 1. **List everything that emits a green signal**: scheduled jobs, guards, health
@@ -74,12 +93,16 @@ Two rules that decide most calls:
    hardcoded customer lists, and opening the page found the other 5, two of them
    rendering side by side on the page that had just been "fixed".
 
-6. **Fix the family, not the instance.** One stale file feeding an LLM means a
+6. **Run dimensions B, C and D** from `references/quality.md`, including the
+   repo's own declared gates (lint, typecheck, test, build). A repo whose own
+   scripts fail is a finding that needs no interpretation.
+
+7. **Fix the family, not the instance.** One stale file feeding an LLM means a
    family of them. The repair is almost never "make it work", it is **make broken
    look different from healthy**. Per-family fixes are in `references/patterns.md`.
 
-7. **Report in the format below.** The format is the gate: it is what makes
-   steps 1 and 5 visible instead of assumed.
+8. **Report and grade** using `references/grading.md`. The format is the gate:
+   it is what makes steps 1 and 5 visible instead of assumed.
 
 ## Confirmation discipline
 
@@ -112,30 +135,23 @@ Two rules that decide most calls:
 
 ## Reporting format
 
-Emit these four blocks, in order.
+The full template and the grading rules are in `references/grading.md`. Use it
+verbatim: one shape every run is what makes two audits comparable.
 
-**1. Scope.** Target, mode, and what you did not cover and why. Silent
-truncation reads as "covered everything".
+Three things about it are not negotiable:
 
-**2. Executed.** Every command, URL and page you actually ran, with the one-line
-result of each. A finding may be labelled `confirmed` only if it cites a line
-here. With no Executed block, nothing is confirmed.
+- **Every run ends in a grade**, `A` to `F`, carrying its coverage
+  (`C (partial: 12/18 families, 3/4 dimensions)`) and one sentence saying what
+  would have lowered it. A grade that cannot go down is decoration, and a
+  partial audit cannot score above `B`.
+- **An Executed block** listing every command, URL and page actually run. A
+  finding is `confirmed` only if it cites a line there. Otherwise it is
+  `suspected`, and suspected findings never drive a grade below `B`.
+- **A coverage block**: one line per family, 18 of them, plus one per dimension.
+  Fewer lines than that means the references were never opened, and the audit
+  does not stand.
 
-**3. Findings**, worst first:
-- **Title**: the lie, stated plainly. "The watchdog checks zero jobs and reports
-  success" beats "watchdog path issue".
-- **Family**: which of the 18.
-- **Evidence**: file:line you opened, and the mechanism.
-- **Blast radius**: what breaks and who notices. If nobody notices, say so,
-  because that is the severity.
-- **Fix**: one sentence.
-- **Confidence**: `confirmed` (reproduced, cites Executed) or `suspected`.
-
-**4. Coverage.** One line per family, 18 of them:
-`<n>. <name> - confirmed N | suspected N | checked, nothing found | not checked: <why>`
-
-Fewer than 18 lines means `references/patterns.md` was never opened, and the
-audit does not stand.
+Never emit a numeric score. `87.3/100` implies a measurement nobody made.
 
 ---
 *Hand-maintained, as of 2026-08-18. The worked examples in

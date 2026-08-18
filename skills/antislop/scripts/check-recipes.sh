@@ -24,12 +24,14 @@ set -uo pipefail
 
 CORPUS="${1:-.}"
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CATALOGUE="$SKILL_DIR/references/patterns.md"
+CATALOGUES="$SKILL_DIR/references/patterns.md $SKILL_DIR/references/quality.md"
 
-if [ ! -f "$CATALOGUE" ]; then
-  echo "FATAL: catalogue not found at $CATALOGUE" >&2
-  exit 2
-fi
+for c in $CATALOGUES; do
+  if [ ! -f "$c" ]; then
+    echo "FATAL: catalogue not found at $c" >&2
+    exit 2
+  fi
+done
 if [ ! -d "$CORPUS" ]; then
   echo "FATAL: corpus directory not found: $CORPUS" >&2
   exit 2
@@ -59,10 +61,30 @@ run_block() {
   local body="$1" first_line="$2"
   [ -z "${body//[[:space:]]/}" ] && return
 
+  if printf '%s' "$body" | grep -q 'antislop:empty-ok'; then
+    # Absence is the good result here, but only if the detector can fire at all.
+    # The positive control is the proof; without one this is an untested claim.
+    local control
+    control=$(printf '%s' "$body" | grep -m1 'antislop:control:' | sed 's/.*antislop:control: *//')
+    if [ -z "$control" ]; then
+      printf '  ERROR %-22s empty-ok with no antislop:control to prove it can fire\n' "$first_line"
+      error=$((error+1)); failures+=("$first_line empty-ok without a positive control")
+      rm -f "$tmp" 2>/dev/null; return
+    fi
+    if (cd "$CORPUS" && eval "$control" >/dev/null 2>&1 </dev/null); then
+      printf '  OKEMPTY %-20s clean, and the detector fires on its control\n' "$first_line"
+      pass=$((pass+1))
+    else
+      printf '  ERROR %-22s control failed: the detector cannot fire\n' "$first_line"
+      error=$((error+1)); failures+=("$first_line positive control did not match")
+    fi
+    return
+  fi
+
   if printf '%s' "$body" | grep -q 'antislop:no-verify'; then
     local reason
     reason=$(printf '%s' "$body" | grep -m1 'antislop:no-verify' | sed 's/.*antislop:no-verify *//')
-    printf '  SKIP  L%-5s %s\n' "$first_line" "${reason:-no reason given}"
+    printf '  SKIP  %-22s %s\n' "$first_line" "${reason:-no reason given}"
     skipped=$((skipped+1))
     return
   fi
@@ -80,9 +102,9 @@ run_block() {
   kill -9 "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null
 
   if [ $rc -ge 128 ]; then
-    printf '  SLOW  L%-5s killed after %ss (a recipe nobody will wait for)\n' \
+    printf '  SLOW  %-22s killed after %ss (a recipe nobody will wait for)\n' \
       "$first_line" "$RECIPE_TIMEOUT"
-    slow=$((slow+1)); failures+=("L$first_line timed out after ${RECIPE_TIMEOUT}s")
+    slow=$((slow+1)); failures+=("$first_line timed out after ${RECIPE_TIMEOUT}s")
     rm -f "$tmp"; return
   fi
 
@@ -98,32 +120,36 @@ run_block() {
   rm -f "$tmp"
 
   if [ "$bytes" -eq 0 ]; then
-    printf '  EMPTY L%-5s matched nothing (a recipe that cannot fire)\n' "$first_line"
-    empty=$((empty+1)); failures+=("L$first_line matched nothing")
+    printf '  EMPTY %-22s matched nothing (a recipe that cannot fire)\n' "$first_line"
+    empty=$((empty+1)); failures+=("$first_line matched nothing")
   elif [ "$hits" -ge "$NOISE_CEILING" ] || [ "$bytes" -gt "$BYTE_CEILING" ]; then
-    printf '  NOISY L%-5s %s hits / %sk bytes (~%sk tokens, too broad to read)\n' \
+    printf '  NOISY %-22s %s hits / %sk bytes (~%sk tokens, too broad to read)\n' \
       "$first_line" "$hits" "$((bytes/1000))" "$((bytes/4000))"
-    noisy=$((noisy+1)); failures+=("L$first_line: $hits hits / $bytes bytes")
+    noisy=$((noisy+1)); failures+=("$first_line: $hits hits / $bytes bytes")
   else
-    printf '  PASS  L%-5s %s hits / %sk bytes\n' "$first_line" "$hits" "$((bytes/1000))"
+    printf '  PASS  %-22s %s hits / %sk bytes\n' "$first_line" "$hits" "$((bytes/1000))"
     pass=$((pass+1))
   fi
 }
 
 echo "corpus: $CORPUS"
-echo "catalogue: $CATALOGUE"
+echo "catalogues: $CATALOGUES"
 echo
 
+for CATALOGUE in $CATALOGUES; do
+CATNAME=$(basename "$CATALOGUE")
+lineno=0
 while IFS= read -r line; do
   lineno=$((lineno+1))
   if [ $in_block -eq 0 ] && [ "$line" = '```bash' ]; then
     in_block=1; block=""; start_line=$((lineno+1)); continue
   fi
   if [ $in_block -eq 1 ] && [ "$line" = '```' ]; then
-    in_block=0; run_block "$block" "$start_line"; continue
+    in_block=0; run_block "$block" "$CATNAME:$start_line"; continue
   fi
   [ $in_block -eq 1 ] && block+="$line"$'\n'
 done < "$CATALOGUE"
+done
 
 echo
 echo "pass=$pass noisy=$noisy slow=$slow empty=$empty error=$error skipped=$skipped"
