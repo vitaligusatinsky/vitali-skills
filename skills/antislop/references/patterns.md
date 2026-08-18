@@ -53,6 +53,8 @@ much, or hangs. Run it after editing this file.
 16. Dedup that suppresses new information
 17. Silent substitution: the fallback that became the answer
 18. The fail-open gate
+19. The checker that read a different page
+20. Valid is not correct
 
 Plus a closing section on the two cross-cutting disciplines.
 
@@ -577,7 +579,110 @@ middleware and watching it go red.
 
 ---
 
-## Cross-cutting: the two disciplines
+## 19. The checker that read a different page
+
+**The lie:** the check passed, and it was looking at something real — just not the
+thing under test.
+
+Distinct from *false green* (family 1), where the check verifies nothing. Here the
+assertion genuinely evaluated a live response. A substitute surface was served in
+place of the application, and it satisfied every condition the check knew to ask:
+a login wall, an SSO interstitial, a CDN or WAF challenge, a captcha, a
+maintenance page, a paywall, a consent gate, a "your deployment is building"
+holding page. All of them return **200**, none of them contain the application's
+error strings, and a check written as *"status is OK and no error text"* passes
+against every single one.
+
+It is worst in exactly the situations where the stakes are highest — verifying a
+deployed preview, a staging environment, a production canary — because those are
+the environments most likely to sit behind an access wall the local one does not
+have.
+
+**Detection**
+```bash
+# assertions that only prove a response arrived
+rg -n "toBe\(200\)|status_code == 200|assertEqual\(.*200|res\.ok\b" \
+  --glob '*{test,spec,e2e,smoke,canary}*' .
+# negative-only assertions: "no error" is not "the right thing"
+rg -n "not.*(error|Error)|assertNotIn|does_not_contain" \
+  --glob '*{test,spec,e2e,smoke}*' .
+```
+Any hit that lacks a positive assertion about application-specific content is a
+candidate.
+
+**Confirmation:** point the check at a URL that is definitely not the app — the
+provider's own login page, a 302 target, `example.com` — and watch it pass. If it
+does, it was never testing the app.
+
+**Fix:** assert something **only the real application can produce**: a landmark or
+role the app's own layout renders, a data value the app alone would know, a
+specific heading. Then add the substitute surfaces to an explicit deny-list so
+they fail loudly rather than silently satisfying a weak condition. Put both in one
+shared helper — every ad-hoc smoke check written later will otherwise reinvent the
+weak version.
+
+For anything behind access protection, remember the check needs the bypass
+credential too; a check that cannot get in will otherwise report the wall as
+health forever.
+
+---
+
+## 20. Valid is not correct
+
+**The lie:** a check from a lower tier of rigour is read as proof from a higher
+one — and often says so plainly, in a place nobody reads.
+
+Every stack has tiers: *parses* < *type-checks* < *schema-valid* < *runs* <
+*behaves correctly under the case you care about*. Each tier is cheap and useful.
+The failure is not using them; it is letting a lower tier stand in for a higher
+one, which happens by default because passing looks identical at every tier.
+
+Concrete pairs, all real:
+- `bash -n` accepts `${$((x/60))}`. It parses. It is a bad substitution that
+  fails the moment it executes. A syntax check is not a run.
+- A type-checker green-lights code against **generated** types. If those types
+  were generated from a rebuild rather than from the live system, the compiler is
+  certifying a description, not reality (family 9).
+- A fixture-shape validator confirms that hand-written scenarios describing
+  behaviour are well-formed. It never runs the code they describe.
+- Schema validation on a payload proves the shape, not that the values mean what
+  the consumer assumes.
+
+**The aggravating factor is naming.** A validator called `replay` that lists 33
+scenario names like `ambiguous-approval-fails-closed` reads as behavioural proof,
+even when its source sets `productionCodeExercised: false` and its output opens
+with the word `Structural`. The disclaimer was present and accurate. It sat in
+the one position readers skip: the first token of a line whose remainder is a
+list they came to read. An artifact named after what it aspires to prove will be
+cited as proof of that thing, by everyone, forever.
+
+**Detection**
+```bash
+# artifacts that declare their own limits in a field rather than a name
+rg -n "structural|dry.?run|shape.?only|does not execute|productionCodeExercised|smoke.?only" \
+  -t ts -t js -t py -t go -t yaml -t json --glob '!*/node_modules/*' .
+# names that assert an outcome the implementation may not test
+rg -n "fails.closed|is.not.zero|never|always|blocks|refuses|rejects" \
+  --glob '*{fixture,scenario,spec,test}*' . | head -40
+```
+For each hit, open the implementation and ask what tier it actually reaches.
+
+**Confirmation:** break the behaviour the name claims and run the check. If it
+stays green, the name is a claim the implementation does not make.
+
+**Fix:** two moves, both cheap and neither optional.
+1. **Name the artifact after what it verifies**, not what it aspires to.
+   `fixture-shape-check` cites correctly; `replay` does not.
+2. **Put the limitation where it is read** — in the command name, and in every
+   line of output, not in a field in the source. A caveat that has to be found is
+   a caveat that will not be.
+Then, where the higher tier is genuinely worth having, promote a small number of
+cases to it rather than promoting the whole suite: three fixtures that actually
+execute beat thirty-three that describe.
+
+---
+
+## Cross-cutting: the disciplines
 
 **Falsify every gate you add.** A new check ships with a case proving it fires
 on the real defect and a case proving it does not fire on correct code. Prove
@@ -590,6 +695,27 @@ inspection, and whole categories the sweep never saw. Re-derive anything
 load-bearing at the source before repeating it, and prefer the remote or live
 reference over the local copy (see family 10, which catches auditors as often
 as it catches code).
+
+**Verify your own claims, on the same terms.** This is the one most often
+skipped, because the auditor is the only reader of their own output and a result
+that matches expectation gets no second pass. An audit of this exact catalogue's
+subject matter produced five wrong orchestrator claims in a day; four were
+caught, one reached a human as stated fact. Every one was a green result that
+confirmed what the auditor already believed. Two tells, both mechanical enough
+to apply while typing:
+
+- **A universal quantifier reached from a sample.** "All eight", "zero",
+  "nothing does X" — after checking three things. Scope the claim to what you
+  actually checked. "None of the 3 configs I read" is shorter than "zero
+  enforcement" *and* true.
+- **Behaviour inferred from a name.** A scenario, test, flag or function called
+  `x-fails-closed` is a title, not an assertion. Open the implementation. This is
+  family 20 turned on the auditor.
+
+The counter-move for both is the same and costs less than the prose it replaces:
+**report the command and its output instead of the synthesis.** A summary is
+where the error enters; the raw evidence is usually shorter and is checkable by
+the reader.
 
 ---
 *Hand-maintained catalogue, as of 2026-08-18. Worked examples are dated
