@@ -14,12 +14,47 @@ Label it as one.
 **Check that your own recipe ran.** A search that matches nothing and a codebase
 with nothing to find print the same thing: silence. Before trusting a clean
 result, run the pattern without its filters and confirm it matches *something*.
-This bites in a specific, silent way: `grep --include='*.{ts,js}'` matches zero
-files, because `--include` takes an fnmatch glob and fnmatch has no brace
-expansion, and the quotes stop the shell expanding it either. It exits 0 and
-prints nothing. Repeat the flag instead (`--include='*.ts' --include='*.js'`),
-or use `rg -t ts -t js`. This file shipped that exact bug in five recipes, which
-is the whole thesis of the skill happening inside the skill.
+**How this file has failed before**, kept because the class recurs and the
+specifics are cheap to forget:
+
+- `grep --include='*.{ts,js}'` matches zero files. `--include` takes an fnmatch
+  glob, fnmatch has no brace expansion, and the quotes stop the shell expanding
+  it. Exits 0, prints nothing. Repeat the flag, or use `rg -t ts -t js`. Five
+  recipes shipped with this.
+- `rg -t rb` is not a valid type (`ruby` is). rg exits non-zero to stderr; a
+  pipe swallows it; the reader sees a clean sweep. Shipped in the flagship
+  family-1 recipe, one paragraph below a warning about exactly this class.
+- An `rg` with no search path may read stdin instead of the directory,
+  depending on the shell it is pasted into. Every recipe here now passes an
+  explicit `.`.
+
+None of those three are present now. `scripts/check-recipes.sh <repo>` runs
+every block in this file and fails on any that matches nothing, matches too
+much, or hangs. Run it after editing this file.
+
+
+## Contents
+
+1. False green
+2. Empty is not absent
+3. Orphaned machinery
+4. Stale truth
+5. Unactionable alert
+6. Success-shaped failure
+7. Partial is not whole
+8. Proof by assertion
+9. The record that outlived the fact
+10. The stale reference
+11. The double that models nothing
+12. The threshold nobody measured
+13. Unnarrowed value at a typed boundary
+14. The idempotent no-op treated as fatal
+15. Dry-run forever
+16. Dedup that suppresses new information
+17. Silent substitution: the fallback that became the answer
+18. The fail-open gate
+
+Plus a closing section on the two cross-cutting disciplines.
 
 ---
 
@@ -30,8 +65,8 @@ is the whole thesis of the skill happening inside the skill.
 **Detection**
 ```bash
 # guards and checkers that read a path or config that may have moved
-rg -n "exists|readFile|readdir|glob\(" -t ts -t js -t py -t go -t rb \
-  | grep -iE "check|guard|verify|validate|watchdog|health"
+rg -n "exists|readFile|readdir|glob\(" -t ts -t js -t py -t go -t ruby \
+  . | grep -iE "check|guard|verify|validate|watchdog|health"
 ```
 For each, ask what it does when its input is missing. If the answer is
 "finds nothing, so passes", it is a false green.
@@ -41,13 +76,18 @@ For each, ask what it does when its input is missing. If the answer is
 **Fix:** a checker that cannot find its input must **throw**, not return zero
 results. Zero results is a claim about the world.
 
-**Seen in the wild.** A cron watchdog, the only detector for a job that silently
-stops firing, read its schedule from a config file that a build cleanup had
-deleted months earlier. The commit message said "the platform never read it",
-true of the platform and false of the watchdog. It returned an empty schedule,
-found nothing overdue, and answered `{ checked: 0, overdue: 0, success: true }`
-every six hours. Thirty-seven jobs were unwatched, including the ones meant to
-catch everything else. The loader had no test because it was not exported.
+**Seen in the wild (2026-08-18, since fixed).** A cron watchdog, the only
+detector for a job that silently stops firing, read its schedule from a config
+file that a build cleanup had deleted months earlier. The commit message said
+"the platform never read it", true of the platform and false of the watchdog. It
+returned an empty schedule, found nothing overdue, and answered
+`{ checked: 0, overdue: 0, success: true }` every six hours. Thirty-seven jobs
+were unwatched, including the ones meant to catch everything else. The loader
+had no test because it was not exported.
+
+Note the date. That system was repaired hours after this was written, so the
+paragraph above describes a world that no longer exists. It is left here dated
+rather than deleted, because an undated version of it would be family 4.
 
 ---
 
@@ -57,8 +97,8 @@ catch everything else. The loader had no test because it was not exported.
 
 **Detection**
 ```bash
-rg -n -B3 "return \[\]|return \{\}|return 0|\?\? \[\]" -t ts -t js \
-  | grep -iE "catch|error"
+rg -n -B3 --no-heading "return \[\]|return \{\}|return 0" -t ts -t js \
+  . | rg -B3 "catch|except|rescue" | rg "return"
 ```
 
 **Confirmation:** revoke the credential or block the network, call the code,
@@ -79,7 +119,8 @@ find its writers; for every scheduled route, find its schedule, and for every
 schedule, find its route.
 ```bash
 # a schedule pointing at nothing, or a job nobody schedules
-rg -n "cron|schedule" -t json -t yaml -t toml
+rg -n '"?(schedule|cron)"?\s*[:=]' -t json -t yaml -t toml \
+  --glob '!*lock*' --glob '!*/node_modules/*' .
 ```
 
 **Confirmation:** check the store's newest row, or the job's last run. If the
@@ -88,13 +129,14 @@ newest row predates the feature's launch, only the migration ever wrote to it.
 **Fix:** delete it, or wire it. A third state, "kept just in case", is how a
 store decays silently from the day it ships.
 
-**Seen in the wild.** A customer registry shipped `upsertCustomer` and
-`upsertCustomerWorkspace`, exported, idempotent, tested, and called by nothing.
-Every row in both tables had been hand-written as an INSERT inside a migration.
-The ticket that shipped it listed "onboarding a customer is a single registry
-write" as its acceptance criterion. That criterion was never met and never
-noticed, because a registry nobody writes to looks exactly like a registry
-nobody has needed to write to yet.
+**Seen in the wild (2026-08-18, since fixed).** A customer registry shipped
+`upsertCustomer` and `upsertCustomerWorkspace`, exported, idempotent, tested,
+and called by nothing. Every row in both tables had been hand-written as an
+INSERT inside a migration. The ticket that shipped it listed "onboarding a
+customer is a single registry write" as its acceptance criterion. That criterion
+was never met and never noticed, because a registry nobody writes to looks
+exactly like a registry nobody has needed to write to yet. Both functions have
+callers now.
 
 ---
 
@@ -105,7 +147,8 @@ nobody has needed to write to yet.
 **Detection:** any hardcoded list of real-world things: customers, staff,
 accounts, regions, model names, price tiers.
 ```bash
-git log -1 --format=%ad -- path/to/list.json   # date every one you find
+# antislop:no-verify template, point it at a real file
+git log -1 --format=%as -- path/to/list.json   # date every list you find
 ```
 
 **Confirmation:** compare the list against the system of record and count the
@@ -175,15 +218,17 @@ case: a list that is short looks short, but a total that is wrong looks fine.
 **Detection**
 ```bash
 # list reads with no explicit bound
-rg -n "\.select\(|SELECT " -t ts -t js -t py \
-  | grep -v "limit\|range\|LIMIT\|first(\|single("
+# Line-scoped, so a fluent chain with .limit() on the NEXT line reads as
+# unbounded. Expect false positives; confirm each by reading the full chain.
+rg -n "\.select\(\*?\)|SELECT \*" -t ts -t js -t py --glob '!*.test.*' .
 # in-memory aggregation over a fetched set
-rg -n "\.length|reduce\(|filter\(.*\)\.length" -t ts -t js
+rg -n "(data|rows|results|items|records)\.(length|reduce\()" -t ts -t js .
 ```
 
 **Confirmation:** ask the server for the true count and compare it against what
 the code received.
 ```bash
+# antislop:no-verify needs a live API and credentials; add your auth header
 curl -sI "$API/table?select=id" -H "Prefer: count=exact" -H "Range: 0-0" \
   | grep -i content-range        # -> 0-0/1525 while the code got 1000
 ```
@@ -236,6 +281,7 @@ built from a local rebuild describe the *migrations*, not the *database*.
 **Confirmation:** introspect the live system and diff it against the artifact.
 ```bash
 # does the column the types promise actually exist?
+# antislop:no-verify needs a live API and credentials; run against your own
 curl -s "$API/table?select=suspicious_column&limit=1" | grep -q "42703" \
   && echo "types promise a column production does not have"
 ```
@@ -260,6 +306,7 @@ it read, and when that was last refreshed.
 
 **Confirmation:** refresh, re-run, and compare the two answers.
 ```bash
+# antislop:no-verify differs on every feature branch by design; read it, do not gate on it
 git fetch origin && git rev-parse HEAD origin/main   # are these the same world?
 ```
 
@@ -281,7 +328,7 @@ whether it takes one row or a thousand.
 **Detection**
 ```bash
 rg -n "order: \(\) =>|limit: \(\) =>|sort: \(\) =>|=> builder|=> this" \
-  --glob '*.test.*' --glob '*.spec.*'
+  --glob '*.test.*' --glob '*.spec.*' .
 ```
 Count how many *independent copies* of the fake exist. Copies drift; a shared
 double at least drifts once.
@@ -315,7 +362,9 @@ body, a fan-out loop.
 **Confirmation: binary-search the real limit against the real system.** Do not
 guess it and do not trust the documented value.
 ```bash
-# grow the input until it fails; the last success is your real ceiling
+# antislop:no-verify call_with_n_items is a placeholder for your own call
+# Grow the input until it fails; the last success is your real ceiling. If every
+# row says FAIL the harness is not wired up, NOT that the ceiling is below 100.
 for n in 100 500 675 676 1000; do
   printf '%s ' "$n"; call_with_n_items "$n" >/dev/null 2>&1 && echo ok || echo FAIL
 done
@@ -373,7 +422,8 @@ the two systems drift further apart.
 
 **Detection**
 ```bash
-rg -n -A2 "if \(!res(ponse)?\.ok\)|status >= 400|raise_for_status\(\)" -t ts -t js -t py
+rg -n -B2 -A4 "already exist|already in|AlreadyExists|duplicate key|409" \
+  -t ts -t js -t py . | rg -i "throw|raise|reject|Error\("
 ```
 Look for an unconditional throw on any non-2xx, with no branch for the
 already-done case.
@@ -407,7 +457,8 @@ indistinguishable from having nothing to do.
 describe. Look for a flag present in the documentation and absent from the
 schedule.
 ```bash
-rg -n "searchParams\.get\('(apply|live|write|execute|confirm)'\)|--apply|--live|--execute" -l
+rg -n -t ts -t js -t py -t go -t sh \
+  "dry[-_]?run|DRY_RUN|--apply|--live|--execute|(apply|live|execute)['\"]\)" .
 ```
 Then read the schedule entry for each file the search returns.
 
@@ -445,6 +496,87 @@ hash. Where a cap is genuinely needed, hash the full set and *display* the cap.
 
 ---
 
+## 17. Silent substitution: the fallback that became the answer
+
+**The lie:** the caller gets a well-formed value and cannot tell it is a
+substitute. Cached, retried, defaulted, imputed or degraded, rather than the
+thing it asked for.
+
+This is the most dangerous family here, because the machinery producing the lie
+exists specifically to hide failure, and it is doing its job perfectly. Error
+rate stays flat. Latency stays flat or improves, because the fallback is faster
+than the thing it replaced. The output is valid and plausible. So the temporary
+degradation becomes the permanent steady state, with no moment at which anyone
+could have noticed.
+
+Family 2 (empty is not absent) is its mildest special case: a substitute that at
+least looks empty. A substitute that looks like real data ends the reader's
+curiosity completely.
+
+Instances: a cache serving stale-if-error through a six-hour origin outage; a
+retry loop that eventually succeeds against a warm replica; a circuit breaker
+whose fallback path has carried 100% of traffic for a month; `?? 0` and
+`getOrDefault` filling a hole with a number that flows into a sum; a permissive
+parser routing malformed rows to a corrupt-record column nobody queries; a
+feature store returning the imputed mean because the pipeline died; an API
+quietly downgrading to a cheaper model under load.
+
+**Detection**
+```bash
+rg -n -t ts -t js -t py -t go --glob '!*.test.*' . \
+  -e 'stale[-_]?(if|while)[-_]?error' -e 'getOrDefault' -e 'CircuitBreaker' \
+  -e 'fallback[A-Za-z]*\s*[:=(]' -e '\bwithRetry\b'
+# and, separately, coalescing INSIDE a catch, which is where it hides:
+rg -n -A3 -t ts -t js 'catch\s*\(' . | rg "\?\?|\|\|"
+```
+The operator is not the finding; the finding is that **the caller cannot tell**.
+Rank hits inside a `catch`, inside a cache layer, or feeding an aggregate first.
+
+**Confirmation:** make the primary path fail, then inspect what the caller
+receives. If it is indistinguishable from a healthy response, confirmed.
+
+**Fix:** provenance travels with the value.
+`return { value, provenance: 'fresh' | 'cached' | 'default' | 'partial' }`, and
+a counter at every substitution site. Then alert on the things that are not
+errors: the **ratio of non-fresh responses**, and **time since the primary path
+last succeeded**. Watching error rates cannot find this, by construction.
+
+---
+
+## 18. The fail-open gate
+
+**The lie:** "this request was authorized", when the check errored, timed out,
+or was never registered, and the failure path is allow.
+
+The system looks *healthier* when the gate is broken, because the denials stop.
+Authorized and unauthenticated traffic produce identical observations: 200s,
+normal latency, no errors.
+
+Instances: an admission webhook with `failurePolicy: Ignore` whose pod is down;
+an unreachable policy sidecar; `rejectUnauthorized: false` left in from
+debugging; JWT verification wrapped in a `try` whose `catch` returns the
+decoded-but-unverified claims; middleware registered after the route it guards.
+
+**Detection**
+```bash
+rg -n "failurePolicy|rejectUnauthorized|verify: false|InsecureSkipVerify|NODE_TLS_REJECT" \
+  -t ts -t js -t py -t go -t yaml .
+rg -n -A4 "catch" -t ts -t js --glob '!*.test.*' \
+  . | rg -i "return.*(token|claims|session|user|true)"
+```
+
+**Confirmation:** present a bad, absent, or expired credential to a protected
+route and assert you get 401 or 403. Do this on a local copy or staging, never
+by disabling auth on a shared system.
+
+**Fix:** two moves, both cheap. **Monitor the negative space**: every gate emits
+a denial counter, and a gate whose denial count is exactly zero over a week is
+either protecting nothing or protecting nothing. Alert on `denials == 0`, not on
+`errors > 0`. Then keep a negative test per gate, proven by removing the
+middleware and watching it go red.
+
+---
+
 ## Cross-cutting: the two disciplines
 
 **Falsify every gate you add.** A new check ships with a case proving it fires
@@ -458,3 +590,7 @@ inspection, and whole categories the sweep never saw. Re-derive anything
 load-bearing at the source before repeating it, and prefer the remote or live
 reference over the local copy (see family 10, which catches auditors as often
 as it catches code).
+
+---
+*Hand-maintained catalogue, as of 2026-08-18. Worked examples are dated
+incidents, not current state.*

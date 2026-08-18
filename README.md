@@ -21,14 +21,17 @@ Or drop a skill folder into `~/.claude/skills/` for Claude Code.
 ### `antislop`
 Find code that lies about its own state. Not a linter and not a style pass: it
 hunts a specific species, machinery that reports success it has not earned.
-Sixteen families with runnable detection recipes, a confirmation step for each,
+Eighteen families with runnable detection recipes, a confirmation step for each,
 and the one question that finds most of them: *what would this look like if it
 were broken?* Covers false greens, checks that record a claim instead of running
 a command, reads that return one page and get treated as the whole set,
 generated artifacts describing a world nobody rechecked, test doubles that no-op
 the semantics they exist to model, jobs scheduled without the flag that lets
 them write, "already exists" treated as fatal so an operation works exactly
-once, and limits nobody has ever measured. Every fix is
+once, and limits nobody has ever measured. Ships `scripts/check-recipes.sh`,
+which runs every detection recipe in the catalogue against a real repo and fails
+if any matches nothing, matches too much, or hangs, because a skill about checks
+that cannot fail has no business shipping one. Every fix is
 aimed at the class, and every new gate has to be proven by breaking the code and
 watching it go red. Triggers on `/antislop`, "audit this repo for dead code",
 "why does this alert never clear", "something broke that every check called fine".
