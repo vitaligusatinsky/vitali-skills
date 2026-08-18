@@ -138,8 +138,8 @@ The findings are the product, so the standard for them is high.
   typechecking before the build never sees them). If a tool has an "ignore
   errors" escape anywhere in its config, assume something is hiding behind it
   and run the steps in the other order.
-- **Measure limits, do not guess them.** When a failure smells like a cap —
-  URL length, body size, batch count, timeout — binary-search the real ceiling
+- **Measure limits, do not guess them.** When a failure smells like a cap
+  (URL length, body size, batch count, timeout), binary-search the real ceiling
   against the real system, then compare it against today's production size. The
   gap is your remaining runway. A documented limit and the enforced one are
   often different numbers.
