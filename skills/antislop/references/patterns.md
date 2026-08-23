@@ -28,9 +28,19 @@ specifics are cheap to forget:
   depending on the shell it is pasted into. Every recipe here now passes an
   explicit `.`.
 
-None of those three are present now. `scripts/check-recipes.sh <repo>` runs
-every block in this file and fails on any that matches nothing, matches too
-much, or hangs. Run it after editing this file.
+Do not take the above as a list of things now fixed — a paragraph claiming a
+class is absent is family 4 waiting to happen, and this one was already false:
+family 21 shipped with three path-less `rg` calls one screen below it. The
+guarantee lives in `scripts/check-recipes.sh <repo>` instead, which runs every
+bash-tagged block in this file and fails on any that matches nothing, matches
+too much, hangs, or omits its search path. Run it after editing this file.
+
+**Every family carries a runnable recipe or says out loud that it has none.**
+Five here are judgement-led rather than grep-led, and each is marked
+`no-recipe:` under its Detection heading. That marker is what the harness
+counts, so a family whose recipe silently stops being seen — an opening fence
+typed without its `bash` tag, which is exactly how family 21 went unchecked for
+a day — fails the run instead of passing quietly.
 
 
 ## Contents
@@ -55,6 +65,8 @@ much, or hangs. Run it after editing this file.
 18. The fail-open gate
 19. The checker that read a different page
 20. Valid is not correct
+21. The marker a human has to remember
+22. Published where nobody reads
 
 Plus a closing section on the two cross-cutting disciplines.
 
@@ -131,6 +143,22 @@ newest row predates the feature's launch, only the migration ever wrote to it.
 **Fix:** delete it, or wire it. A third state, "kept just in case", is how a
 store decays silently from the day it ships.
 
+**Inert is not free — rank orphans by what they cost while idle.** The usual
+framing treats orphaned machinery as harmless clutter to tidy up eventually.
+Some orphans run a meter. A dependency nothing imports still gets installed, and
+if the install feeds a size-capped cache it can evict the cache on every build.
+Ask of each orphan: does anything *pay* for it per unit time — install seconds,
+storage, a cached artifact's size budget, a paid API's idle quota, a warm
+instance? An orphan with a meter outranks a dozen dead exports.
+
+**Seen in the wild (2026-08-22, since fixed).** A prompt-eval devDependency ran
+in no CI workflow and executed on no deploy — textbook orphan, and by the usual
+severity ranking, cosmetic. Its 122-package provider tree was 2.1 GB of the
+4.0 GB `node_modules`, which pushed the platform's build cache 0.34 GB over a
+1.5 GB cap. The cache was therefore discarded and rebuilt on *every* deploy for
+roughly five months. Removing the orphan took production builds from 4.7 min to
+2 min. Nothing "ran"; it still cost more than anything that did.
+
 **Seen in the wild (2026-08-18, since fixed).** A customer registry shipped
 `upsertCustomer` and `upsertCustomerWorkspace`, exported, idempotent, tested,
 and called by nothing. Every row in both tables had been hand-written as an
@@ -177,6 +205,8 @@ change, and was the only available fix for the files with no live equivalent.
 the channel it arrives in.
 
 **Detection:** for each alert string, search for the command that resolves it.
+
+`no-recipe: the search term is the product's own alert strings, which differ per repo. Grep for the alert text you find, then for the command that clears it.`
 If the remediation is a function with no entry point, there is no path.
 
 **Confirmation:** try to clear it using only what the alert tells you.
@@ -198,6 +228,8 @@ naming all along, then put the exact pre-filled command in the message.
 **The lie:** failure encoded as a normal result.
 
 **Detection:** responses carrying both a success status and an error payload:
+
+`no-recipe: the tell is a status/payload disagreement, not a token. Read the response shapes your telemetry records as successes.`
 `200` with a populated `errors` array, an exit code of 0 with a stderr dump, a
 "partial success" that telemetry counts as a run.
 
@@ -244,6 +276,20 @@ that throws** rather than truncating, otherwise the fix reintroduces the bug at
 a larger number. Paging requires a **total order**: a non-unique sort key lets
 rows repeat or vanish across page boundaries, so add a unique tiebreaker.
 
+**The filter that quietly became the denominator.** Pagination is the loud
+version. The quiet version is a `where` clause: you aggregate over
+`state == 'READY'`, `status == 'active'`, `deleted_at IS NULL` — each defensible
+on its own — and then report the total as if it covered everything. Nothing
+truncates, no cue fires, and the number is confidently low. Whenever a total is
+computed from a filtered read, state the filter **in the same sentence as the
+number**, or compute the unfiltered total alongside it and show both.
+
+**Seen in the wild (2026-08-22).** A build-cost estimate summed the durations of
+deployments in state `READY` — the successful ones — and reported it as monthly
+build spend. Cancelled and errored builds consume build minutes too. The real
+figure was 17% higher. The filter was never wrong; presenting its output as the
+whole was.
+
 ---
 
 ## 8. Proof by assertion
@@ -256,6 +302,8 @@ This is the purest form of the species. A proof harness that accepts
 downstream treats it as evidence.
 
 **Detection:** for every check id, status field or "verified" flag, find the
+
+`no-recipe: you are looking for a setter whose input is an argument rather than an exit code. That is a call-graph question, not a pattern.`
 code that sets it. If the setter's input is an argument rather than an exit
 code, an assertion or a parsed output, it is self-attested.
 
@@ -396,6 +444,8 @@ The usual cause is a field used for two purposes: a provenance column holding
 `primary ?? fallback` expression feeding both into a typed query.
 
 **Detection:** every `a ?? b` or `a || b` where `a` and `b` come from different
+
+`no-recipe: the finding is two fields of different shapes meeting in one coalescing expression. Which fields those are is repo-specific; start from the typed queries and read backwards.`
 fields, and the result is passed to a typed query, parser or cast.
 
 **Confirmation:** query the column and count values that do not match the
@@ -487,6 +537,8 @@ normalising digits away so `429` and `503` collapse into the same condition;
 hashing a set of ids without its count, so an addition changes nothing.
 
 **Detection:** read every fingerprint, hash, or dedup-key function used for
+
+`no-recipe: read the fingerprint functions your alerting actually uses. There is no token that distinguishes a lossy key from a sound one.`
 alert suppression, and ask what it discards. Look for `slice(`, `take(`,
 truncation constants, and digit-stripping regexes.
 
@@ -576,6 +628,23 @@ a denial counter, and a gate whose denial count is exactly zero over a week is
 either protecting nothing or protecting nothing. Alert on `denials == 0`, not on
 `errors > 0`. Then keep a negative test per gate, proven by removing the
 middleware and watching it go red.
+
+**Enumerate every exit, including the one that only prints.** A guard placed on
+the automated path and not the advisory path has not closed anything — it has
+moved the unsafe act from the program to the person reading its output, who has
+strictly *less* context about why it was refused. If a tool declines to do
+something, it must not then print the command that does it. Treat printed
+suggestions, copy-paste blocks, generated runbooks and error-message "try this"
+hints as exits subject to the same precondition as the code.
+
+**Seen in the wild (2026-08-22, three rounds).** A hygiene tool deleted remote
+branches only when an API confirmed no open PR existed. When that API failed, an
+empty PR list read as "no branch has a PR" — fail-open, round one. Round two
+gated the destructive call on the API having actually answered. Round three
+found the dry-run still printing a ready-to-paste
+`git push origin --delete <names>` for exactly those branches, unguarded. Same
+defect, three exits: the filter, the action, and the advice. Fixing two of three
+felt like fixing it.
 
 ---
 
@@ -682,12 +751,175 @@ execute beat thirty-three that describe.
 
 ---
 
+## 21. The marker a human has to remember
+
+**The lie:** correctness depends on someone editing a constant, and the code
+says so out loud — `// bump this when the shape changes`. The comment reads as
+documentation. It is actually an admission that the mechanism does not work.
+
+The tell is a literal whose only job is to be different from last time: a
+`SCHEMA_VERSION`, a `CACHE_VERSION`, a `migrationLevel`, a hand-typed hash. It
+is never wrong at the moment it is written, so review passes. It goes wrong on
+the change *after* the one that introduced it, made by someone who did not know
+the constant existed.
+
+**Why it survives review: the failure is invisible to the person shipping it.**
+This is the property that makes it worth its own family. A developer testing a
+change starts from a clean state — a fresh browser profile, an empty cache, a
+new container — and clean state always takes the new code path. The stale path
+only exists for someone who was there *before*, so the author, the reviewer and
+CI all see the fix working while every returning user sees the old behaviour.
+Nobody is lying and nobody is careless; the test is structurally incapable of
+reaching the broken case.
+
+A worked example. A demo app cached a per-visitor snapshot and re-seeded it only
+when a fingerprint changed. The fingerprint was `hash(serverPayload) + ":" +
+SANDBOX_VERSION`, and `SANDBOX_VERSION` was `"stable-links-v3-catalog-groups"`,
+hand-edited. A change then altered how the *same* payload was mapped — a
+publisher's songwriter had been showing in the Artist column where the
+performing act belonged. The payload did not change, so the hash did not change,
+so the constant was the only thing that could have forced a re-seed, and it was
+not bumped. New visitors got the fix. Everyone who had ever opened the demo
+before — every prospect it existed for — kept the wrong names indefinitely. It
+was found only because a user and a developer looked at the same URL and
+described different screens.
+
+**The general shape:** a cache key built from the inputs to a transform but not
+from the transform itself. Change the code, keep the data, serve a stale result
+forever. Same family: memoisation keyed on arguments while the memoised function
+closes over changing config; a CDN key of the source asset but not the build
+that compiled it; a "has this migration run" flag keyed on a name that gets
+edited in place.
+
+**Detection**
+
+```bash
+# hand-edited literals whose only job is to differ from last time
+rg -n "SCHEMA_VERSION|CACHE_VERSION|STATE_VERSION|_VERSION\s*=\s*[\"']" \
+  -t ts -t js -t py -t go -t sh .
+# the comment that admits the mechanism does not work
+rg -n -B2 "bump (this|the)|increment (this|when)|remember to (bump|update)" \
+  -t ts -t js -t py -t go -t sh .
+# version-shaped literals in config, where they rot unread
+rg -n "version:\s*[0-9]+|v[0-9]+-[a-z-]+\"" -t ts -t js -t yaml -t json \
+  --glob '!*lock*' .
+```
+
+Then, for each hit, find every place the cached artifact is *produced* and ask
+whether a change there can move the key. Also read the tests: a test asserting
+the literal (`expect(key()).toBe("published-revision:stable-links-v3")`) is part
+of the defect, because it makes the correct fix look like a regression.
+
+**Confirmation:** change the transform without changing its input, rebuild, and
+load as an entity that has state from before — a browser profile you already
+used, a warm cache, an existing row. If the old result survives, confirmed. A
+fresh profile proves nothing here; that is the path that already worked.
+
+**Fix:** derive the marker from something that moves on its own. In order of
+preference:
+
+1. **Key on the build** — commit SHA or build id injected at compile time. One
+   line, no maintenance, and no change of any kind can escape it. The cost is a
+   re-seed on unrelated deploys; when the cached thing is cheap to rebuild,
+   that is the right trade.
+2. **Key on the output** — hash the transform's *result*, not its input, so the
+   key moves exactly when what the user sees moves. Strictly better when the
+   output is deterministic; check for timestamps and randomness first, or the
+   key changes on every run and the cache stops existing.
+3. **Keep the literal only where neither is possible**, and then put the
+   invariant in a test rather than a comment — assert the *property* ("differs
+   across builds", "stable within a build"), never the literal value.
+
+**Adjacent smell worth reporting together:** anything else whose correctness
+rests on a human remembering — a hand-maintained allowlist beside a generated
+one, a "keep this in sync with X" comment, a duplicated constant in two files, a
+count in prose next to the list it counts. Each is the same bet, and the house
+edge grows with every contributor who has not read the comment.
+
+---
+
+## 22. Published where nobody reads
+
+**The lie:** the system *is* reporting the failure. It reports it after the
+success line, in the last few lines of a log, in a place the reader has already
+stopped reading. Nothing is hidden and nothing is silent — and nobody knows.
+
+This is the inverse of family 1. False green is a signal that cannot go red.
+Here the signal goes red every single time, correctly, in writing, and is still
+worth nothing. The defect is in the *position* of the message, not its content,
+which is why code search never finds it: grep the source and the log line is
+right there, looking fine.
+
+Two shapes dominate:
+
+- **After the summary.** A pipeline prints `Build Completed`, then does
+  post-work — cache upload, artifact publish, cleanup, notification — and that
+  post-work fails. Readers stop at the summary; tooling that scrapes "the
+  result" stops there too.
+- **Below the fold.** The message is inside output long enough that everyone
+  `head`s it, or it sits in a per-run log that only opens when someone is
+  already suspicious.
+
+**Detection**
+```bash
+# success announced before work that can still fail: a done/complete/success
+# log line with more fallible statements after it in the same routine
+rg -n -i "(console\.(log|info)|logger\.(info|log)|echo|print)\b.*\b(done|complete|completed|success|succeeded|finished)\b" \
+  -t ts -t js -t sh -t py --glob '!*.test.*' .
+```
+```bash
+# antislop:no-verify needs live CI/build systems and credentials.
+# Read the TAIL of the most recent run of every scheduled job and build.
+# The summary line is not the end of the log.
+vercel inspect "$DEPLOYMENT_URL" --logs | tail -25
+gh run view "$RUN_ID" --log | tail -25
+journalctl -u "$UNIT" -n 25 --no-pager
+```
+
+**Confirmation:** take one recurring job and read the final 25 lines of its last
+three runs, not the summary and not the exit code. Then ask what would have to
+appear there for anyone to notice. If the answer is "someone would have to go
+looking", the message is unread by design.
+
+**Fix:** move the verdict to where the reader already is, and make the tail
+loud. Re-emit any post-summary failure *as* the job's status rather than after
+it — a cache that was rejected is a failed step, not a footnote. Where the
+platform will not let you reorder its output, add a check that greps the tail
+and raises on its own schedule, so the finding arrives without anyone opening a
+log. **Exit code is not enough**: most of these failures are non-fatal by
+design, which is exactly why they persist.
+
+**Seen in the wild (2026-08-22, since fixed).** Every production build of a
+Next.js app ended with `Build cache size 1.84 GB exceeds limit of 1.50 GB.
+Invalidating cache. Next build will start with an empty cache.` — printed on
+100% of builds, for months, on the line after `Deployment completed`. So every
+build ran cold, each additionally spending ~76s writing a cache that was deleted
+seconds later. The build script's own comment said it kept the cache "warm,
+cheaper builds". The disproof was published, in full, in every log, and the
+string `Restored build cache` had never once appeared in the project's history.
+Nobody reads past `Deployment completed`.
+
+---
+
 ## Cross-cutting: the disciplines
 
 **Falsify every gate you add.** A new check ships with a case proving it fires
 on the real defect and a case proving it does not fire on correct code. Prove
 it by breaking the code and watching the check go red, then restoring it. A
 regression test that passes against the bug is decoration.
+
+**Verify from the state a real user is in, not from a clean one.** Fresh
+containers, new browser profiles, empty caches and brand-new rows all take the
+new code path by construction, so a check run that way can only ever confirm the
+change. The bugs that survive to production are the ones that need prior state
+to reproduce: a stale cache, a row written by the previous schema, a session
+opened before the deploy, a config a returning user already has. Before
+reporting a fix verified, name which starting state you used, and re-run from a
+dirty one — reuse the profile, keep the cache, take an existing record. If you
+cannot get into the returning state naturally, construct it: write the old value
+back and reload. An incident behind family 21 ran for hours with a user and an
+agent describing different screens at the same URL, because every agent check
+started clean and every user visit did not.
 
 **Verify what a delegate reports.** A sub-agent or a colleague produces claims,
 not facts. Expect error in both directions: confident findings that dissolve on
@@ -718,5 +950,5 @@ where the error enters; the raw evidence is usually shorter and is checkable by
 the reader.
 
 ---
-*Hand-maintained catalogue, as of 2026-08-18. Worked examples are dated
+*Hand-maintained catalogue, as of 2026-08-23. Worked examples are dated
 incidents, not current state.*

@@ -1,7 +1,8 @@
 # Dimensions B, C and D: dead weight, conventions, test integrity
 
-Dimension A is the eighteen lie families in `patterns.md`, and it carries the
-most weight in the grade. These three are the rest of the picture: they are what
+Dimension A is the lie families in `patterns.md`, and it carries the most
+weight in the report. The count lives in one place — the catalogue — so this
+file does not repeat it; a number restated here is a number that drifts here. These three are the rest of the picture: they are what
 a competent reviewer would say about the code even when nothing is lying.
 
 Keep them in that order of authority. A repo with perfect conventions and a

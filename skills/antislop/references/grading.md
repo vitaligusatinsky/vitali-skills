@@ -1,126 +1,154 @@
-# The report and the grade
+# The report
 
-One output shape, every run, so two audits of the same repo are comparable and
-an audit of two repos is comparable. If you change the shape, the grade stops
-meaning anything.
+One shape every run, so two audits are comparable — but only the parts that
+stop an audit being lazy. Everything here earns its place by making a specific
+failure visible. If a block is not doing that, it is filler, and filler is what
+readers learn to skip.
+
+Two things this format used to do and no longer does, because both were
+ceremony:
+
+- **A line per family, every run.** Twenty-two lines of "checked, nothing
+  found" does not prove anyone checked. It buries the two lines that carry
+  information — the gaps — under twenty that do not. Report the gaps.
+- **`A-<family n>` labels.** A finding tagged `A-17` reads as a case number.
+  Name the family: *the fallback that became the answer*. The reader learns
+  something from the name and nothing from the number.
 
 ## Contents
 
-1. The grade, and what it is allowed to be
+1. The verdict
 2. Grading rules
-3. Coverage gating
-4. The report template
-5. Worked example of a grade
+3. What coverage has to say
+4. The template
+5. How a finding should read
 
 ---
 
-## 1. The grade, and what it is allowed to be
+## 1. The verdict
 
-A single letter, `A` to `F`, plus a coverage suffix.
+One letter, `A` to `F`, and one sentence of plain English saying how much of
+the system you actually looked at and what would have made it worse.
 
 ```
-GRADE: C (partial: 12/18 families, 3/4 dimensions)
+**D.** One confirmed fail-open gate, in the branch-deletion path. I checked 14
+of the 22 families and 3 of the 4 dimensions — a partial read, so treat a
+better letter as unearned rather than as a clean bill of health.
 ```
 
-Three rules keep the grade honest, and they matter more than the thresholds:
+The letter is worth keeping for one reason: the caps below are mechanical, so
+the same findings produce the same letter for any auditor, and a genuinely bad
+finding cannot be written up as "mostly healthy". That is the whole job it does.
 
-- **A grade that cannot go down is decoration.** State, every time, what would
-  have lowered it. If nothing could have, you did not audit.
-- **No false precision.** Never emit `87.3/100`. A letter carries exactly as
-  much resolution as the evidence supports, and a decimal implies measurement
-  nobody made.
-- **Coverage travels with the grade, always.** An `A` from four families
-  checked is worth less than a `C` from eighteen, and the reader cannot tell
-  unless you print the denominator.
+Two rules keep it honest:
+
+- **A grade that cannot go down is decoration.** Say what would have lowered
+  it. If nothing could have, you did not audit.
+- **Never a number.** `87.3/100` implies a measurement nobody made. A letter
+  carries exactly as much resolution as the evidence supports.
 
 ## 2. Grading rules
 
-Start at `A` and apply every cap that fires. The lowest cap wins. Caps are
-mechanical: the same findings must produce the same grade for any auditor.
+Start at `A` and apply every cap that fires. The lowest cap wins.
 
 | Trigger | Cap |
 |---|---|
 | Any **confirmed** lie-family finding on an auth, payment, data-integrity or deletion path | **F** |
-| Any **confirmed** check that cannot fail (family 1, 6 or 8) anywhere | **D** |
-| Any **confirmed** silent substitution or fail-open gate (family 17, 18) | **D** |
+| Any **confirmed** check that cannot fail — *false green*, *success-shaped failure*, *proof by assertion* | **D** |
+| Any **confirmed** *silent substitution* or *fail-open gate* | **D** |
 | 3 or more **confirmed** lie-family findings of any kind | **D** |
 | 1 to 2 **confirmed** lie-family findings | **C** |
-| Only **suspected** lie-family findings, none confirmed | **B** |
-| Dead weight over 15% of the surveyed surface (dimension B) | one step down |
-| Convention breaches in a security, money or migration path (dimension C) | one step down |
-| Test integrity failing (dimension D): assertions that survive a mutation | one step down |
+| Only **suspected** findings, none confirmed | **B** |
+| Dead weight over 15% of the surveyed surface | one step down |
+| Convention breaches in a security, money or migration path | one step down |
+| Test integrity failing: assertions that survive a mutation | one step down |
 | Nothing confirmed, nothing suspected, full coverage | **A** |
 
-`confirmed` means reproduced and cited in the Executed block. A `suspected`
-finding never caps below `B`, because unproven claims must not drive a grade
-any more than they drive a fix.
+**A partial audit cannot score above `B`**, whatever it found. An audit that
+checked four things and found nothing must not read like a clean bill of health.
 
-## 3. Coverage gating
+`confirmed` means you reproduced it and the report cites the command that did.
+Everything else is `suspected`, and a suspected finding never caps below `B` —
+unproven claims must not drive a grade any more than they drive a fix. Guessing
+which one a finding is defeats the point of having two words.
 
-The grade is suffixed `(partial: n/18 families, m/4 dimensions)` unless both are
-complete, and **a partial audit cannot score above `B`**. This is the whole
-anti-slop point of the grade: an audit that checked four things and found
-nothing must not read like a clean bill of health.
+## 3. What coverage has to say
 
-If you could not check something, the coverage line says why. `not checked: no
-runnable recipe for this language` is a good answer. Inventing a sweep is not.
+Not a line per family. Two things, both short:
 
-## 4. The report template
+- **The denominator, once**, inside the verdict sentence: how many families and
+  dimensions you actually got to.
+- **The gaps, named.** Every family you could not check, with the reason.
+  `stale truth — not checked, no hardcoded real-world lists in this repo` is a
+  good answer. `dedup — not checked, this repo has no alerting` is a good
+  answer. Inventing a sweep is not, and neither is silence.
 
-Emit these six blocks, in order, every run.
+Five families are judgement-led and ship no runnable recipe; they are marked
+`no-recipe:` in the catalogue. Skipping one of those is a choice you made and
+it belongs in the gaps list like any other.
+
+## 4. The template
 
 ```markdown
-# Antislop report: <target>
+# Antislop: <target>
+`<commit sha>` · audit-only | audit-and-fix · <date>
 
-**GRADE: <letter> (<coverage suffix>)**
-<one sentence: what would have lowered this, and what did>
+**<letter>.** <what capped it, in one clause.> I checked <n> of the <N>
+families and <m> of the 4 dimensions. <What would have made this worse.>
 
-## 1. Scope
-Target, commit SHA, mode (audit-only / audit-and-fix), date.
-What was not covered, and why.
+## What I ran
+Every command, URL and page, with its one-line result. A finding is
+`confirmed` only if it points at a line here. Say here if you sampled a
+ranked subset rather than reading every hit, and how you ranked it.
 
-## 2. Executed
-Every command, URL and page actually run, with its one-line result.
-A finding may be `confirmed` only if it cites a line here.
+## What I found
+Worst first. Prose, not a form — see section 5.
 
-## 3. Findings (worst first)
-### <n>. <the lie, stated plainly>
-- **Dimension / family**: A-<family n> | B dead weight | C conventions | D tests
-- **Evidence**: file:line, and the mechanism
-- **Blast radius**: what breaks, who notices. "Nobody notices" is the severity
-- **Fix**: one sentence
-- **Confidence**: confirmed | suspected
+## What I did not check
+One line per gap, with the reason. Omit this section only if there are none.
 
-## 4. Dimension scores
-| Dimension | Result | Evidence |
-|---|---|---|
-| A. Honest signals (18 families) | n confirmed, n suspected | |
-| B. Dead weight | n% of surveyed surface | |
-| C. Conventions | n breaches, n in critical paths | |
-| D. Test integrity | pass / fail / not run | |
+## Where it stands
+| | Result |
+|---|---|
+| Honest signals | n confirmed, n suspected |
+| Dead weight | n% of <denominator> surveyed lines |
+| Conventions | n breaches, n in critical paths |
+| Test integrity | pass / fail / not run |
 
-## 5. Coverage
-18 lines, one per family:
-`<n>. <name> - confirmed N | suspected N | checked, nothing found | not checked: <why>`
-Then one line per dimension B, C, D.
-
-## 6. What would change this grade
-The specific, smallest set of fixes that moves it up a letter.
+## What would move the letter
+The smallest set of fixes that gets it up one.
 ```
 
-## 5. Worked example of a grade
+## 5. How a finding should read
 
-From the audit that produced this skill, graded after the fact:
+Like a person explaining a problem to someone who has to fix it. Lead with what
+is untrue, not with a label.
 
+```markdown
+### The branch cleanup deletes on an API failure
+
+`scripts/git-hygiene.ts:212` deletes a remote branch when the PR lookup returns
+an empty list — but an empty list is also what a failed lookup returns, so an
+outage at GitHub reads as "no branch has an open PR" and every branch qualifies.
+
+I reproduced it: with the token unset, the dry run listed 6 branches for
+deletion including two with open PRs (`What I ran`, line 4).
+
+Nobody would notice until the branches were gone, which is the severity here.
+The fix is to require the lookup to have answered before it can authorise a
+delete — and separately, the dry run still prints a ready-to-paste
+`git push origin --delete`, which is the same defect at a second exit.
+
+*The fail-open gate · confirmed*
 ```
-GRADE: D (full: 18/18 families, 4/4 dimensions)
 
-Capped at D by two confirmed family-1 findings: a cron watchdog that checked
-zero of 37 scheduled jobs and returned success, and a registry whose only
-write path had no callers. Neither touched auth or payments, so it did not
-reach F. It would have been C with one such finding, and B if both had been
-suspected rather than reproduced.
-```
+The parts that are not optional: **what is untrue**, **where**, **who notices
+and when**, **confirmed or suspected**, and **the fix**. The order and the
+prose are yours. What must not happen is a finding that reads like a form
+someone filled in, because that is the register in which nobody checks whether
+the claim is true — including the person who wrote it.
 
-That is the shape to copy. The grade is a claim, so it carries the reason it is
-not a better one.
+One trap worth naming, because it is this catalogue's own family turned on the
+auditor: **a finding stated more confidently than it was checked is the thing
+you came to find.** If you did not run it, write `suspected` and say what you
+would have to run.

@@ -21,22 +21,35 @@ Or drop a skill folder into `~/.claude/skills/` for Claude Code.
 ### `antislop`
 Find code that lies about its own state. Not a linter and not a style pass: it
 hunts a specific species, machinery that reports success it has not earned.
-Eighteen families with runnable detection recipes, a confirmation step for each,
-and the one question that finds most of them: *what would this look like if it
-were broken?* Covers false greens, checks that record a claim instead of running
-a command, reads that return one page and get treated as the whole set,
-generated artifacts describing a world nobody rechecked, test doubles that no-op
-the semantics they exist to model, jobs scheduled without the flag that lets
-them write, "already exists" treated as fatal so an operation works exactly
-once, and limits nobody has ever measured. Ships `scripts/check-recipes.sh`,
-which runs every detection recipe against a real repo and fails if any matches
-nothing, matches too much, or hangs, because a skill about checks that cannot
-fail has no business shipping one. Every run ends in a graded report (A to F)
-carrying its own coverage, so a partial audit cannot read as a clean bill of
-health, across four dimensions: the lie families, dead weight and duplication,
-the conventions the repo claims for itself, and whether its tests would have
-failed on the real defect. Every fix is
-aimed at the class, and every new gate has to be proven by breaking the code and
+Twenty-two families, each with a detection recipe, a confirmation step that
+proves a finding rather than suspecting it, and a fix aimed at the class rather
+than the instance — plus the one question that finds most of them: *what would
+this look like if it were broken?* Covers false greens, checks that record a
+claim instead of running a command, reads that return one page and get treated
+as the whole set, generated artifacts describing a world nobody rechecked, test
+doubles that no-op the semantics they exist to model, jobs scheduled without the
+flag that lets them write, "already exists" treated as fatal so an operation
+works exactly once, fallbacks that quietly became the answer, gates that fail
+open, limits nobody has ever measured, correctness that depends on a human
+remembering to bump a constant, and failures published correctly in a position
+nobody reads.
+
+Five families are judgement-led and ship no runnable recipe; they say so, and
+the harness fails if a family is silently missing one. That harness is
+`scripts/check-recipes.sh`, which runs every recipe against a real repo and
+fails if any matches nothing, matches too much, hangs, or omits its search path
+— because a skill about checks that cannot fail has no business shipping one.
+It also audits the skill's own claims: the catalogue's contents against its
+headings, and every family count stated in prose (including this paragraph)
+against the catalogue, with a canary proving the checker has not gone blind.
+
+Every run ends in a one-line verdict, a letter A to F with the coverage it was
+reached from, so a partial audit cannot read as a clean bill of health — across
+four dimensions: the lie families, dead weight and duplication, the conventions
+the repo claims for itself, and whether its tests would have failed on the real
+defect. Findings are written as sentences a person can act on, marked
+`confirmed` or `suspected`, and `confirmed` means the report cites the command
+that reproduced it. Every new gate has to be proven by breaking the code and
 watching it go red. Triggers on `/antislop`, "audit this repo for dead code",
 "why does this alert never clear", "something broke that every check called fine".
 

@@ -14,8 +14,9 @@ the tests assert the same wrong thing the code does.
 ## Do this first
 
 1. **Read the three references, before searching anything.**
-   `references/patterns.md` has the 18 lie families, the grep for each, and the
-   step that confirms rather than suspects. `references/quality.md` has
+   `references/patterns.md` has the 22 lie families, the recipe for each, and
+   the step that confirms rather than suspects. Five of them are judgement-led
+   and say so; the rest carry a recipe that is proven to fire. `references/quality.md` has
    dimensions B, C and D. `references/grading.md` has the report template and
    the grading rules. This page deliberately does not summarise them: a summary
    is a page treated as the whole set, which is family 7.
@@ -54,7 +55,7 @@ Every run reports all four, and the grade weights them in this order.
 
 | | Dimension | What it asks |
 |---|---|---|
-| **A** | Honest signals | Do the 18 lie families appear? Heaviest weight |
+| **A** | Honest signals | Do the 22 lie families appear? Heaviest weight |
 | **B** | Dead weight | Unreferenced exports, duplication, dead config and deps |
 | **C** | Conventions | Does the repo follow the rules it states for itself? |
 | **D** | Test integrity | Would the tests have failed on the real defect? |
@@ -101,8 +102,9 @@ B, C and D are in `references/quality.md`.
    family of them. The repair is almost never "make it work", it is **make broken
    look different from healthy**. Per-family fixes are in `references/patterns.md`.
 
-8. **Report and grade** using `references/grading.md`. The format is the gate:
-   it is what makes steps 1 and 5 visible instead of assumed.
+8. **Report and grade** using `references/grading.md`. The "What I ran" block
+   is the gate: it is what makes step 5 evidence instead of assertion, and it
+   is what the words `confirmed` and `suspected` are anchored to.
 
 ## Confirmation discipline
 
@@ -127,33 +129,34 @@ B, C and D are in `references/quality.md`.
 
       <recipe> | awk -F: '{print $1}' | sort | uniq -c | sort -rn | head -20
 
-  Open the top ten files, not the top five hundred lines, and say in the Scope
-  block that you sampled and how.
+  Open the top ten files, not the top five hundred lines, and say in
+  "What I ran" that you sampled and how.
 - **Rank by blast radius, not hit count.** Anything under a scheduler, a
   security or auth path, a migration, or a script that writes, goes first. The
   same expression in a React component is usually cosmetic.
 
 ## Reporting format
 
-The full template and the grading rules are in `references/grading.md`. Use it
-verbatim: one shape every run is what makes two audits comparable.
+The template is in `references/grading.md`. Three things in it are not
+negotiable, and everything else is prose you should write like a person:
 
-Three things about it are not negotiable:
+- **A one-line verdict**: a letter `A` to `F`, what capped it, and how much of
+  the system you actually reached. A grade that cannot go down is decoration,
+  and a partial audit cannot score above `B`.
+- **A "What I ran" block** listing every command, URL and page. A finding is
+  `confirmed` only if it points at a line there. Otherwise it is `suspected`,
+  and suspected findings never drive a grade below `B`.
+- **The gaps, named.** Every family or dimension you did not get to, with the
+  reason. Not a line per family — twenty-two lines of "checked, nothing found"
+  proves nothing and buries the two lines that carry information.
 
-- **Every run ends in a grade**, `A` to `F`, carrying its coverage
-  (`C (partial: 12/18 families, 3/4 dimensions)`) and one sentence saying what
-  would have lowered it. A grade that cannot go down is decoration, and a
-  partial audit cannot score above `B`.
-- **An Executed block** listing every command, URL and page actually run. A
-  finding is `confirmed` only if it cites a line there. Otherwise it is
-  `suspected`, and suspected findings never drive a grade below `B`.
-- **A coverage block**: one line per family, 18 of them, plus one per dimension.
-  Fewer lines than that means the references were never opened, and the audit
-  does not stand.
-
-Never emit a numeric score. `87.3/100` implies a measurement nobody made.
+Write findings as sentences, not as filled-in forms: what is untrue, where, who
+notices and when, confirmed or suspected, and the fix. Name the family in words
+rather than by number — `A-17` is a case number, *the fallback that became the
+answer* tells the reader what happened. Never emit a numeric score; `87.3/100`
+implies a measurement nobody made.
 
 ---
-*Hand-maintained, as of 2026-08-18. The worked examples in
+*Hand-maintained, as of 2026-08-23. The worked examples in
 `references/patterns.md` are dated incidents, not current state: two of them
 were already false within a day of being written, which is the point.*
