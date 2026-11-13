@@ -279,7 +279,18 @@
     if (!lh || txt.length < 40) continue;
     const lines = Math.max(1, Math.round(el.getBoundingClientRect().height / lh));
     if (lines < 2) continue;
-    const cpl = txt.length / lines;
+    // Characters on the widest real line, not total / lines: a short last line hid a
+    // 90-character measure in a two-line list item (critic, 13.11 round 2).
+    const rects = [];  // text boxes only (a range over an element also returns its children's border boxes)
+    const tw0 = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let t = tw0.nextNode(); t; t = tw0.nextNode()) {
+      const rng = document.createRange(); rng.selectNodeContents(t);
+      for (const q of rng.getClientRects()) if (q.width > 0) rects.push(q);
+    }
+    const tw = rects.reduce((a, q) => a + q.width, 0);
+    const perLine = {};  // inline children (<b>, <a>) split a line into several rects: sum them per line
+    for (const q of rects) { const k = Math.round(q.top / 4); perLine[k] = (perLine[k] || 0) + q.width; }
+    const cpl = tw ? Math.max(...Object.values(perLine)) / (tw / txt.length) : txt.length / lines;
     if (cpl > P.maxMeasure) { longLines++; if (cpl > worst) { worst = cpl; worstEl = el; } }
   }
   if (longLines) add("measure", `${longLines} paragraphs run longer than ${P.maxMeasure} characters per line (worst ${Math.round(worst)})`, worstEl);

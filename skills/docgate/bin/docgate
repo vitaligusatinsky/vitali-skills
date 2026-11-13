@@ -316,6 +316,22 @@ def check_fill(metrics, profile):
 
 
 # ----------------------------------------------------------------------------- render command
+def check_quality(pdf):
+    """Relational layout quality (lib/quality.py): card in card, faint frames, big type
+    boxed narrow, a smear of gap sizes. Banded from best-in-class reference reports."""
+    sys.path.insert(0, str(HERE / "lib"))
+    import quality
+    out, per_page = [], []
+    for r, fs in quality.analyze(Path(pdf)):
+        m = r.metrics
+        per_page.append({"page": r.page, "frames": len([f for f in r.frames if f.lines]),
+                         "frame_depth_max": m.get("frame_depth_max"), "gap_levels": m.get("gap_levels"),
+                         "frame_contrast_min": m.get("frame_contrast_min")})
+        for f in fs:
+            out.append((f["rule"], f["detail"], f"page {r.page}"))
+    return out, per_page
+
+
 def do_render(src, out_pdf, profile_name, tiles=None, quiet=False, allow_drift=False):
     src, out_pdf = Path(src), Path(out_pdf)
     profile = load_profile(profile_name)
@@ -348,6 +364,8 @@ def do_render(src, out_pdf, profile_name, tiles=None, quiet=False, allow_drift=F
     metrics, tile_paths = measure_and_tile(pngs, profile, pre.get("margins_mm"))
     findings += check_fill(metrics, profile)
     findings += check_stranded(out_pdf, pre.get("margins_mm") or profile["page"]["margin_mm"], profile["fill"])
+    q_findings, q_pages = check_quality(out_pdf)
+    findings += q_findings
 
     # waivers
     waivers = {}
@@ -379,6 +397,7 @@ def do_render(src, out_pdf, profile_name, tiles=None, quiet=False, allow_drift=F
         "page_count": len(metrics),
         "fonts": sorted(set(r["name"].split("+")[-1] for r in font_rows)),
         "preflight_metrics": pre["metrics"],
+        "quality": q_pages,
         "waivers": waivers,
         "results": results,
         "tiles_dir": str(tiles_dir),
@@ -579,6 +598,10 @@ def main():
     pr.add_argument("outdir")
     pr.add_argument("--dpi", type=int, default=100)
     pr.add_argument("--labels", default="before,after")
+    q = sub.add_parser("quality", help="measure layout quality of any PDF (no receipt), e.g. a reference report")
+    q.add_argument("pdf")
+    q.add_argument("--pages")
+    q.add_argument("-v", "--verbose", action="store_true")
     sub.add_parser("version")
     a = ap.parse_args()
     if a.cmd == "pair":
@@ -590,6 +613,20 @@ def main():
         return do_check(a.pdf)
     if a.cmd == "test":
         return do_test(a.manifest or [str(DEFAULT_MANIFEST)], a.only, a.verbose)
+    if a.cmd == "quality":
+        sys.path.insert(0, str(HERE / "lib"))
+        import quality
+        pages = [int(x) for x in a.pages.split(",")] if a.pages else None
+        bad = 0
+        for r, fs in quality.analyze(Path(a.pdf), pages):
+            for f in fs:
+                bad += f["severity"] == "fail"
+                print(f"  p{r.page:02d} {f['severity'].upper():5s} {f['rule']:13s} {f['detail']}")
+            if a.verbose:
+                mm = {k: v for k, v in r.metrics.items() if k not in ("heading_ratios", "gap_list")}
+                print(f"  p{r.page:02d} metrics " + json.dumps(mm, ensure_ascii=False, default=str))
+        print(f"docgate quality: {'FAIL' if bad else 'PASS'} ({bad} blocking)")
+        return 1 if bad else 0
     if a.cmd == "version":
         print(json.dumps(tool_versions()))
         return 0

@@ -24,7 +24,59 @@
      "page-size"
     ]
    },
-   "note": "clean control: white table gaps, pale grid lines, soft connectors and a nested box must not fire"
+   "note": "clean control: white table gaps, pale grid lines, soft connectors and a typographic question must not fire"
+  },
+  {
+   "id": "synthetic-nested-frame",
+   "source": {
+    "file": "synthetic/nested-frame.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "nested-frame"
+    ]
+   },
+   "note": "card in card: a white box with text inside a tinted panel"
+  },
+  {
+   "id": "synthetic-faint-frame",
+   "source": {
+    "file": "synthetic/faint-frame.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "faint-frame"
+    ]
+   },
+   "note": "a panel tint 0.03 OKLab L off white: the boundary does not read"
+  },
+  {
+   "id": "synthetic-large-narrow",
+   "source": {
+    "file": "synthetic/large-narrow.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "large-narrow"
+    ]
+   },
+   "note": "a 16 pt question crammed into a narrow box"
+  },
+  {
+   "id": "synthetic-gap-levels",
+   "source": {
+    "file": "synthetic/gap-levels.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "gap-levels"
+    ]
+   },
+   "note": "seven different gap sizes on one page: no ratio between gaps"
   },
   {
    "id": "synthetic-leading",
@@ -297,7 +349,10 @@
     ]
    },
    "expect": {
-    "pass": true,
+    "pass": false,
+    "fail": [
+     "gap-levels"
+    ],
     "not": [
      "type-scale",
      "text-size",
@@ -305,10 +360,12 @@
      "measure",
      "arrow-stub",
      "arrow-gap",
-     "stranded-heading"
+     "stranded-heading",
+     "nested-frame",
+     "large-narrow"
     ]
    },
-   "note": "the template, built by report_kit with the brand fonts: must pass with no warnings (needs REPORT_FONTS)"
+   "note": "KNOWN FAILURE (14.11.2026): report-base v1 uses six break sizes a page, which harness v2 rejects (best-in-class references use at most five). Flip to pass when the redesigned rhythm (1/2/4 lines) lands in report-base."
   }
  ]
 }

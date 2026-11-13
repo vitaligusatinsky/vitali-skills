@@ -71,6 +71,47 @@ Rules, the loop and the rejection protocol: `~/.claude/rules-library/document-de
 
 Waive a rule for one document with a reason: `<meta name="docgate-waive" content="fill: ...">`.
 
+## Quality rules (harness v2, `lib/quality.py`)
+
+The rules above catch defects. These catch what a designer means by "cramped", "card in card",
+"poor visibility of boundaries" and "no ratio between sizes and gaps". They read only the PDF
+(text lines from `pdftotext -bbox-layout`, frames from the raster), so the same numbers run on
+our renders and on any reference PDF: `docgate quality any.pdf [-v]`. `render` runs them too.
+All lengths are in body-line pitches, so pages at any size compare.
+
+| id | level | what | banded from |
+|---|---|---|---|
+| `nested-frame` | fail | a framed box with text inside another frame (card in card) | 0 of 292 reference pages |
+| `faint-frame` | fail | a text frame under 0.04 OKLab L from its ground: the boundary does not read | every reference frame sits at ≥ 0.05 |
+| `large-narrow` | fail | 1.3–2.2× body text wrapped ≥ 4 lines under 34 characters, inside a box | 0 reference pages (open pull-quote columns are fine) |
+| `gap-levels` | fail | 6+ distinct break sizes on a page | references use at most 5 |
+| `gap-scale` | warn | 5 break sizes | reference max |
+| `frame-heavy` | warn | 3+ framed text boxes on a page | references frame text on 15% of pages |
+
+Measured and not used, because references do the same: overall ink density, gap above vs below
+headings, distinct left edges, narrow body columns under 40 characters (103 of 269 reference
+pages), widows. A rule may block only if no reference page trips it.
+
+## Calibration, harness v2 (14.11.2026)
+
+- **Controls:** 166 pages from four best-in-class reports (Nesta strategy, Design Council
+  Design for Innovation, Sitra 2025, Demos Helsinki 2018) set the bands. 126 held-out pages
+  (Nesta annual report 2023-24, Design Council Systemic Design) were checked after: 0 fail.
+  The held-out set caught one overreach first (large pull quotes in open columns), which is why
+  `large-narrow` only applies inside a box.
+- **Negatives:** the owner-rejected client versions fail on every rejected page. The refined
+  rebuild (rejected 13.11 evening) fails 18 of 18 pages; the version before it 10 of 13.
+- **Jitter fixtures:** the control with one injected defect each (`synthetic-nested-frame`,
+  `-faint-frame`, `-large-narrow`, `-gap-levels`) must fail on exactly that rule.
+- **Not a gate: LLM judges.** Benchmarked 14.11 on 11 owner-rejected pages and 17 reference
+  pages (Claude Opus 5.5, Sonnet 5.5, Gemini 3.8 Flash; 318 calls, USD 6): every model rejected
+  all 11 rejected pages, and also 73-98% of the references; pairwise accuracy was near chance
+  (5-7 of 11). An LLM judge says "no" to everything, so it cannot be the gate. `doc-critic`
+  stays an advisor whose located findings a builder fixes or waives; measurable findings it
+  raises become rules here.
+- `measure` now counts the widest real line (text boxes per line), not characters / lines: a
+  short last line had hidden a 90-character measure in two-line list items.
+
 ## Calibration (13.11.2026)
 
 Calibrated on a client interim report: six rejected versions and the approved

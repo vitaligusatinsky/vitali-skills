@@ -46,6 +46,12 @@
     "text-size": "warn",
     "type-scale": "warn",
     "radius": "warn",
-    "line-through-text": "warn"
+    "line-through-text": "warn",
+    "nested-frame": "fail",
+    "faint-frame": "fail",
+    "large-narrow": "fail",
+    "gap-levels": "fail",
+    "gap-scale": "warn",
+    "frame-heavy": "warn"
   }
 }

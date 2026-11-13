@@ -26,7 +26,9 @@
   --measure: 52ch;   /* ch is the width of '0'; at Nohemi's average letter width 52ch is about 75 characters */
   --radius: 10px;
   --ink: #1C171B; --ink-2: #3D3147; --muted: #6D5A7D; --accent: #473855;
-  --tint: #F6F4F0; --plum: #F1E6EC; --warm: #FBEEE7; --warn: #9A3412; --warn-dot: #C2410C;
+  /* Frame tints sit at least 0.06 OKLab L below white: every frame in 292 best-in-class reference
+     pages sat at >= 0.05, and the old #F6F4F0 (0.03) read as no boundary at all (rule faint-frame). */
+  --tint: #F0EAE3; --plum: #F1E6EC; --warm: #F7E6DC; --warn: #9A3412; --warn-dot: #C2410C;
   --serif: 'Landour', Georgia, serif; --sans: 'Nohemi', system-ui, sans-serif;
 }
 
