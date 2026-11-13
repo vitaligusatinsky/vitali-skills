@@ -53,8 +53,8 @@ def card(title, owner, now, goal, snags, ask, votes=None):
             f'<h3>{title}</h3>' + (f'<span class="votes">{votes}</span>' if votes else "") +
             f'</div><div class="owner">{owner}</div>'
             f'<div class="nowgoal"><div><h4>Now</h4>{p(now)}</div><div><h4>Target</h4>{p(goal)}</div></div>'
-            '<div class="snag"><h4>Where it snags</h4><ul>' + "".join(f"<li>{s}</li>" for s in snags) + '</ul></div>'
-            f'<div class="ask"><b>Question for you</b>{ask}</div></section>')
+            '<div class="tail"><div class="snag"><h4>Where it snags</h4><ul>' + "".join(f"<li>{s}</li>" for s in snags) + '</ul></div>'
+            f'<div class="ask"><b>Question for you</b>{ask}</div></div></section>')
 
 
 def main(out):

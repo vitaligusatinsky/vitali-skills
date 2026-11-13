@@ -107,6 +107,7 @@ tr { break-inside: avoid; }
 .card { background: var(--tint); border-radius: var(--radius); padding: var(--pad-y) var(--pad-x); margin-bottom: var(--gap); -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .card-head, .card .owner { break-after: avoid; }
 .nowgoal > div, .snag, .card .ask { break-inside: avoid; }
+.card .tail { break-inside: avoid; }       /* the snag list and the question travel together: never a lone question box overleaf */
 .card-head { display: flex; align-items: baseline; gap: var(--s-3); }
 .card-head .votes { margin-left: auto; font-size: var(--fs-label); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-variant-numeric: tabular-nums; }
 .card .owner { color: var(--muted); margin: var(--s-1) 0 var(--s-3); }
