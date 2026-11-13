@@ -14,7 +14,10 @@
     "maxHeadingPt": 26,
     "maxRadii": 3,
     "maxTinyRuns": 50,
-    "minLineLuminance": 0.02
+    "minLineLuminance": 0.02,
+    "maxMeasure": 80,
+    "minRunIn": 5,
+    "maxTipGap": 3
   },
   "fill": { "min_nonfinal": 0.55, "min_final": 0.15, "ink_threshold": 250 },
   "levels": {
@@ -28,6 +31,10 @@
     "divider": "fail",
     "hard-lines": "fail",
     "tiny-text": "fail",
+    "measure": "fail",
+    "arrow-stub": "fail",
+    "arrow-gap": "fail",
+    "box-overflow": "fail",
     "text-collision": "fail",
     "page-size": "fail",
     "fonts": "fail",

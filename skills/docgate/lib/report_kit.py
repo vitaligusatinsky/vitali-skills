@@ -136,7 +136,7 @@ class Swimlane:
     }
     Build two diagrams on one row grid with rows=Swimlane.shared_rows(a, b) so they line up.
     """
-    W, STEP_W, SYS_W, GAP, HEAD_H, PAD = 658, 74, 92, 4, 30, 5
+    W, STEP_W, SYS_W, GAP, HEAD_H, PAD = 658, 74, 92, 4, 26, 5
     EXIT = 6                               # vertical connectors leave a box this far from its edge
     FT = FD = FB = LABEL_PX               # title, detail, break note: all the label step
     LT, LD, LB = 10.8, 10.3, 10.3          # line heights (1.16 x the label step, 1.1 for detail)
@@ -170,10 +170,17 @@ class Swimlane:
             return 9, self.box_w - 9 - lane
         return 9, self.box_w - 9
 
+    def _fit(self, lines, max_px, size, weight, what):
+        for ln in lines:
+            if text_w(ln, size, weight) > max_px + 0.5:
+                raise ValueError(f"swimlane: '{ln}' in {what} is {text_w(ln, size, weight):.0f}px, the box allows {max_px:.0f}px. "
+                                 f"Break the word with a soft hyphen (\\u00ad) or shorten it.")
+        return lines
+
     def node_metrics(self, title, detail, brk, nid=None):
         inner = self.box_w - 2 * self.PAD
-        tl = wrap_px(title, inner, self.FT, 600)
-        dl = wrap_px(detail, inner, self.FD) if detail else []
+        tl = self._fit(wrap_px(title, inner, self.FT, 600), inner, self.FT, 600, f"the title of {nid}")
+        dl = self._fit(wrap_px(detail, inner, self.FD), inner, self.FD, 400, f"the detail of {nid}") if detail else []
         bl = wrap_px(brk, self.note_x(nid, brk)[1], self.FB, 500) if brk else []
         box_h = 6 + len(tl) * self.LT + (2 if dl else 0) + len(dl) * self.LD + 5
         total = box_h + (6 + len(bl) * self.LB if bl else 0)
@@ -183,7 +190,9 @@ class Swimlane:
         s = self.s
         rows = [28.0] * len(s["steps"])
         for nid, row, lane, title, detail, brk in s["nodes"]:
-            rows[row] = max(rows[row], self.node_metrics(title, detail, brk, nid)[4] + 4)
+            total = self.node_metrics(title, detail, brk, nid)[4]  # measures the note, and so decides self.below
+            # a box whose arrow leaves from under its note sits at the top of its row, with the run-in below it
+            rows[row] = max(rows[row], total + (self.RUN_IN + 6 if nid in self.below else 2))
         for r, sys_text in enumerate(s.get("systems") or []):
             rows[r] = max(rows[r], len(wrap_px(sys_text, self.SYS_W - 20, self.FD)) * self.LD + 18)
         votes = s.get("votes") or {}
@@ -237,12 +246,12 @@ class Swimlane:
                              f'fill="#FFFFFF" stroke="{ACCENT}" stroke-width="0.8"/>')
                 for j, line in enumerate(sl):
                     o.append(t(sys_x + 10, sy + 11 + j * self.LD, line, self.FD, 400, INK2))
-        boxes, node_row = {}, {}
+        boxes, node_row, solid = {}, {}, {}
         for nid, row, lane, title, detail, brk in s["nodes"]:
             node_row[nid] = row
             tl, dl, bl, bh, total = self.node_metrics(title, detail, brk, nid)
             x = lane_x[lane] + 3
-            y = row_y[row] + (rows[row] - total) / 2
+            y = row_y[row] + (3 if nid in self.below else (rows[row] - total) / 2)
             o.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{self.box_w:.1f}" height="{bh:.1f}" rx="3" '
                      f'fill="#FFFFFF" stroke="{BOX}" stroke-width="0.8"/>')
             for j, line in enumerate(tl):
@@ -257,31 +266,72 @@ class Swimlane:
                     o.append(t(x + nx, by + j * self.LB, line, self.FB, 500, WARN))
             # a connector leaving from under a full-width note starts below the note
             boxes[nid] = (x, y, self.box_w, (total + 2) if nid in self.below else bh)
+            solid[nid] = (x - 2, y - 2, self.box_w + 4, total + 4)  # box plus its note: what a line must avoid
         for a, b in s["edges"]:
-            rb = node_row[b]
-            # horizontal runs travel along the row boundary, where no text lives
-            hy = row_y[rb] if rb > node_row[a] else row_y[rb] + rows[rb]
-            o.append(self._edge(boxes[a], boxes[b], kind, hy, self.EXIT))
+            others = [r for k, r in solid.items() if k not in (a, b)]
+            o.append(self._edge(boxes[a], boxes[b], kind, others, self.EXIT))
         o.append("</svg>")
         return "\n".join(o)
 
     @staticmethod
-    def _edge(A, B, kind, hy, ex_off):
+    def _hits(seg, rects):
+        x1, y1, x2, y2 = seg
+        lo_x, hi_x, lo_y, hi_y = min(x1, x2), max(x1, x2), min(y1, y2), max(y1, y2)
+        return any(lo_x < rx + rw and hi_x > rx and lo_y < ry + rh and hi_y > ry for rx, ry, rw, rh in rects)
+
+    RUN_IN = 9  # the last straight run into a box: room for the arrowhead plus a visible line
+
+    @classmethod
+    def _edge(cls, A, B, kind, others, ex_off):
+        """Route one connector. Every arrow ends with a straight run of at least RUN_IN
+        into its target, its tip 1.5 units off the box edge."""
         ax, ay, aw, ah = A
         bx, by, bw, bh = B
         if by < ay + ah and by + bh > ay:  # rows overlap: horizontal at the shared middle
             my = (max(ay, by) + min(ay + ah, by + bh)) / 2
             p = (f"M{ax + aw:.1f},{my:.1f} H{bx - 1.5:.1f}" if bx > ax else f"M{ax:.1f},{my:.1f} H{bx + bw + 1.5:.1f}")
+        elif abs(bx - ax) < 1:  # same lane: one straight drop
+            sx = ax + aw - ex_off
+            p = (f"M{sx:.1f},{ay + ah:.1f} V{by - 1.5:.1f}" if by > ay else f"M{sx:.1f},{ay:.1f} V{by + bh + 1.5:.1f}")
         else:
-            sx = ax + aw - ex_off if bx > ax else ax + ex_off
-            ex = bx + 10 if bx > ax else bx + bw - 10
-            if abs(bx - ax) < 1:
-                sx = ex = ax + aw - ex_off
-            if by > ay:
-                p = f"M{sx:.1f},{ay + ah:.1f} V{hy:.1f} H{ex:.1f} V{by - 1.5:.1f}"
-            else:
-                p = f"M{sx:.1f},{ay:.1f} V{hy:.1f} H{ex:.1f} V{by + bh + 1.5:.1f}"
+            right = bx > ax
+            sx = ax + aw - ex_off if right else ax + ex_off
+            sy = ay + ah if by > ay else ay
+            # preferred: drop in the source lane, then enter the target from the side at its title
+            my = by + 9.5
+            tip = bx - 1.5 if right else bx + bw + 1.5
+            if not cls._hits((sx, sy, sx, my), others) and not cls._hits((sx, my, tip, my), others):
+                p = f"M{sx:.1f},{sy:.1f} V{my:.1f} H{tip:.1f}"
+            else:  # fallback: enter from the top with a real run-in
+                ex = bx + 10 if right else bx + bw - 10
+                hy = by - cls.RUN_IN - 1.5 if by > ay else by + bh + cls.RUN_IN + 1.5
+                end = by - 1.5 if by > ay else by + bh + 1.5
+                p = f"M{sx:.1f},{sy:.1f} V{hy:.1f} H{ex:.1f} V{end:.1f}"
         return f'<path d="{p}" fill="none" stroke="{LINE}" stroke-width="1.2" stroke-linejoin="round" marker-end="url(#ah{kind})"/>'
+
+
+# ----------------------------------------------------------------------------- phase pages
+def phase_page(i, steps, title, facts, breaks, ask, now, goal, snags,
+               labels=("Vaihe", "Missä tieto katkeaa", "Kysymys teille", "Nyt", "Tavoite", "Missä takkuaa")):
+    """One page per step of a flow, the same frame every time (report-base `.phase`):
+    the flow strip with this step highlighted, step number and title, facts as (label, html)
+    pairs, where information breaks, the question, then now | target and the snags.
+    Pass `labels` in the report's language."""
+    step, brk_l, ask_l, now_l, goal_l, snag_l = labels
+    flow = "".join(f'<span class="{"here" if k == i else ("done" if k < i else "")}">{name}</span>' for k, name in enumerate(steps))
+    paras = lambda xs: "".join(f"<p>{x}</p>" for x in xs)
+    return (
+        '<section class="phase">'
+        f'<div class="flow" style="--steps:{len(steps)}">{flow}</div>'
+        '<div class="phase-head"><div class="who">'
+        f'<div class="label step-no">{step} {i + 1} / {len(steps)}</div><h2>{title}</h2>'
+        '<dl class="facts">' + "".join(f"<div><dt>{k}</dt><dd>{v}</dd></div>" for k, v in facts) + '</dl></div>'
+        '<div class="why">'
+        + (f'<div class="breaks"><div class="label">{brk_l}</div><ul>' + "".join(f"<li>{b}</li>" for b in breaks) + '</ul></div>' if breaks else "")
+        + f'<div class="ask"><b>{ask_l}</b><p>{ask}</p></div></div></div>'
+        f'<div class="nowgoal"><div><h4>{now_l}</h4>{paras(now)}</div><div><h4>{goal_l}</h4>{paras(goal)}</div></div>'
+        f'<div class="snag"><h4>{snag_l}</h4><ul>' + "".join(f"<li>{x}</li>" for x in snags) + '</ul></div>'
+        '</section>')
 
 
 # ----------------------------------------------------------------------------- bar chart

@@ -446,7 +446,7 @@ def do_test(manifests, only=None, verbose=False):
                 src = materialise(e, mpath.parent, work)
                 rec = do_render(src, work / f"{e['id']}.pdf", e.get("profile", manifest.get("profile", "a4-report")),
                                 tiles=work / f"{e['id']}-tiles", quiet=True)
-            except (RuntimeError, SystemExit) as exc:
+            except Exception as exc:  # a crash in one fixture is a failed fixture, not a dead run
                 rows.append((e["id"], False, f"could not run: {exc}", ""))
                 ok_all = False
                 continue

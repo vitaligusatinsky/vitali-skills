@@ -47,44 +47,54 @@ TARGET = dict(CURRENT, systems_label="One data model", systems_framed=True,
               edges=[("b1", "b2"), ("b2", "b3"), ("b3", "b4"), ("b4", "b5"), ("b5", "b6"), ("b6", "b7")])
 
 
-def card(title, owner, now, goal, snags, ask, votes=None):
-    p = lambda xs: "".join(f"<p>{x}</p>" for x in xs)
-    return ('<section class="card"><div class="card-head">'
-            f'<h3>{title}</h3>' + (f'<span class="votes">{votes}</span>' if votes else "") +
-            f'</div><div class="owner">{owner}</div>'
-            f'<div class="nowgoal"><div><h4>Now</h4>{p(now)}</div><div><h4>Target</h4>{p(goal)}</div></div>'
-            '<div class="tail"><div class="snag"><h4>Where it snags</h4><ul>' + "".join(f"<li>{s}</li>" for s in snags) + '</ul></div>'
-            f'<div class="ask"><b>Question for you</b>{ask}</div></div></section>')
-
-
 def main(out):
     cur, tgt = rk.Swimlane(CURRENT), rk.Swimlane(TARGET)
     rows = rk.Swimlane.shared_rows(cur, tgt)
     sections = (
-        '<h2>What the day covered</h2>'
+        '<h2 class="page first">What the day covered</h2>'
         '<div class="tbl"><table><thead><tr><th style="width:18%">Time</th><th style="width:30%">Topic</th><th>What came out of it</th></tr></thead><tbody>'
         '<tr><td>10.00–11.30</td><td>The order today</td><td>One order traced from request to invoice: who does what, in which tool, where it waits.</td></tr>'
         '<tr><td>12.30–14.00</td><td>The order as it should be</td><td>The same journey on one shared data model, step by step.</td></tr>'
+        '<tr><td>09.30–10.00</td><td>Introductions</td><td>Each role in its own words: sales, design, workshop, installers, office.</td></tr>'
         '<tr><td>14.00–14.30</td><td>Votes and the one thing</td><td>Where the problems weigh most, and the single most important change.</td></tr>'
+        '<tr><td>14.30–15.30</td><td>Tools and data</td><td>The spreadsheets, the accounting system and the chat groups: what each holds and what the team wants to give up.</td></tr>'
+        '<tr><td>15.30–16.00</td><td>Closing</td><td>Start from the ideal and break it into phases; the spreadsheets and sample files were requested.</td></tr>'
         '</tbody></table></div>'
-        '<div class="two mt"><div class="panel"><h2>Votes</h2><p class="lead">Where the problems weigh most, counted from the board.</p>'
-        + rk.bar_chart([("Planning", 3), ("Production", 1)]) +
-        '</div><div class="panel plum"><h2>Deliverables agreed</h2><ul class="points"><li><b>A clickable prototype</b> per role.</li>'
-        '<li><b>A requirements report</b> on the critical interfaces.</li><li><b>An effort estimate</b> and a technical roadmap.</li></ul></div></div>'
-        '<section class="figure"><h2>The order today, by role</h2>'
+        '<div class="feature mt"><h2>The one thing</h2><p class="lead">We asked each person: what is the single most important change?</p><div class="items">'
+        '<div class="wide"><b>Information without walking.</b><span>“Finding anything out means walking over and asking.”</span></div>'
+        '<div><b>One shared picture</b><span>Resources visible when the deal is made.</span></div>'
+        '<div><b>Enough information up front</b><span>No need to go and ask separately.</span></div></div></div>'
+        '<section class="page figure"><h2 class="first">The order today, by role</h2>'
         '<p class="lead">Steps run top to bottom, the column says who does the work, and the orange note shows where information breaks.</p>'
         + cur.svg("current", rows) + '</section>'
         '<section class="figure"><h2>The order on one data model</h2>'
         '<p class="lead">The target as drawn on the board. The right-hand column shows what each step records.</p>'
         + tgt.svg("target", rows) + '</section>'
-        '<section><h2>Step by step</h2>'
-        '<p class="lead">For each step: how it works now, where it snags, what the target is, and what we would like you to confirm.</p>'
-        + card("Offer", "Sales, with the owner", ["Requests arrive by email with drawings attached.", "Prices come from a spreadsheet and are typed into the offer."],
-               ["The offer is drafted per room and checked by a person.", "Sales can see what delivery time is realistic before promising one."],
-               ["Resources are not checked when the deal is closed.", "Each seller prices in their own way."], "Who prices an offer in practice?", "2 votes")
-        + card("Planning", "Office", ["A rough plan is made in a spreadsheet at the weekly meeting."], ["Three proposed schedules, with load shown per week."],
-               ["The plan runs behind the work it describes."], "Who approves a production batch?", "3 votes")
-        + '</section>'
+        + rk.phase_page(0, STEPS, "Offer", [("Lead", "Sales, with the owner"), ("Roles", "Client, Sales"), ("Votes", "2 votes"), ("Systems now", 'Email, spreadsheet<span class="to">Target: room list, price per room</span>')],
+                        ["Inputs lost in hand-off"], "Who prices an offer in practice, and does it depend on the kind of job?",
+                        ["Requests arrive by email with drawings, room lists and colour plans attached; the materials are read off the drawings.",
+                         "A spreadsheet module prices the standard cabinets; everything else is priced by hand from a price list that is itself typed in.",
+                         "The offer is written in the accounting system, and its scope is marked on printed floor plans with a separate list of exceptions.",
+                         "After the deal, a kick-off meeting with design hands over the job; the client receives a form asking for the missing information."],
+                        ["The request is turned into a room-by-room list of materials and prices that a person checks before it is sent.",
+                         "Prices are kept current, with three supplier quotes per item and a negotiation margin.",
+                         "Sales can test which delivery date is realistic before promising one, because the planner's load is visible.",
+                         "Won and lost offers are kept apart from production planning."],
+                        ["Resources and design time are not checked when the deal is closed, so a delivery date is a promise without a plan.",
+                         "Each of five sellers prices in their own spreadsheet and runs the process their own way.",
+                         "Contract and delivery terms are not collected in one place, so payment terms can turn out wrong after signing."], labels=("Step", "Where information breaks", "Question for you", "Now", "Target", "Where it snags"))
+        + rk.phase_page(1, STEPS, "Planning", [("Lead", "Office"), ("Roles", "Office"), ("Votes", "3 votes"), ("Systems now", 'Spreadsheet<span class="to">Target: load and draft batches</span>')],
+                        ["Kept apart from sales"], "Who approves a production batch, and can one batch hold parts from several projects?",
+                        ["A rough plan is made in a spreadsheet before design can start: rooms, blocks, a rough content per room and the measuring date.",
+                         "Load is counted per week against capacity in four units: boards, joinery hours, assembled cabinets and finishing.",
+                         "Room estimates are grouped into production batches by the site schedule and by material waste, and each batch gets a designer.",
+                         "A planning meeting every Tuesday keeps the plan; the files live in a shared project folder."],
+                        ["Three proposed schedules come out of the site schedule, the material and the work phases, and a person approves one.",
+                         "Batches can change as the job moves, and the original estimate stays visible beside the current one.",
+                         "Delivery dates and design time per batch are proposed from the load, not remembered."],
+                        ["The plan runs behind the work it describes: next month is not yet planned when it should be.",
+                         "The spreadsheet is apart from every other system, so nothing flows into it or out of it.",
+                         "Picking is in no load, and nobody measures how long it takes."], labels=("Step", "Where information breaks", "Question for you", "Now", "Target", "Where it snags"))
     )
     html = TEMPLATE.read_text(encoding="utf-8").format(
         lang="en", title="Example interim report", css=rk.css("Example report · draft for review"), logo="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 28 28%27%3E%3Ccircle cx=%2714%27 cy=%2714%27 r=%2714%27 fill=%27%231C171B%27/%3E%3C/svg%3E",

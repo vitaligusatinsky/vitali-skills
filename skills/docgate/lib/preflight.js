@@ -15,6 +15,10 @@
 //   divider      a raw rule line between sections: <hr> or a lone top/bottom border  (fail)
 //   text-collision  diagram labels overlapping each other                           (fail)
 //   line-through-text  connectors drawn through diagram text                         (warn)
+//   measure      running text over maxMeasure characters per line                  (fail)
+//   arrow-stub   a turning connector whose last run is shorter than minRunIn       (fail)
+//   arrow-gap    an arrow tip further than maxTipGap from any box                   (fail)
+//   box-overflow a diagram label running past the edge of its own box                (fail)
 //   inset        framed containers use more than one padding-left                   (warn)
 //   gutter       grid/flex columns use more than one column gap                      (warn)
 //   hard-lines   diagram connectors drawn in near-black (luminance < minLineLuminance)(fail)
@@ -220,9 +224,65 @@
     if (hits) add("text-collision", `${hits} pairs of diagram labels overlap (first: ${first})`, svg.parentElement);
   }
 
+  // ---- arrowheads: a turning connector needs a straight run-in, and its tip must reach a box
+  let stubs = 0, tipGaps = 0, firstStub = null, firstGap = null;
+  for (const svg of document.querySelectorAll("svg")) {
+    if (!visible(svg)) continue;
+    const boxes = [...svg.querySelectorAll("rect")].map((r) => r.getBBox()).filter((b) => b.width < 200 && b.height < 200);
+    for (const ln of svg.querySelectorAll("path[marker-end]")) {
+      const toks = (ln.getAttribute("d") || "").match(/[MLHV]|-?[\d.]+/g) || [];
+      const pts = []; let x = 0, y = 0, cmd = "M";
+      for (let i = 0; i < toks.length;) {
+        if (/[MLHV]/.test(toks[i])) { cmd = toks[i++]; continue; }
+        if (cmd === "H") x = +toks[i++]; else if (cmd === "V") y = +toks[i++]; else { x = +toks[i++]; y = +toks[i++]; }
+        pts.push([x, y]); if (cmd === "M") cmd = "L";
+      }
+      if (pts.length < 2) continue;
+      const [x1, y1] = pts[pts.length - 2], [x2, y2] = pts[pts.length - 1];
+      const last = Math.hypot(x2 - x1, y2 - y1);
+      const minRun = pts.length > 2 ? P.minRunIn : P.minRunIn - 1.5;  // a straight arrow between adjacent boxes may be short, never a bare head
+      if (last < minRun) { stubs++; firstStub = firstStub || ln.getAttribute("d"); }
+      const dist = Math.min(...boxes.map((b) => {
+        const dx = Math.max(b.x - x2, 0, x2 - (b.x + b.width)), dy = Math.max(b.y - y2, 0, y2 - (b.y + b.height));
+        return Math.hypot(dx, dy);
+      }));
+      if (boxes.length && dist > P.maxTipGap) { tipGaps++; firstGap = firstGap || ln.getAttribute("d"); }
+    }
+  }
+  if (stubs) add("arrow-stub", `${stubs} arrows turn on a final run shorter than ${P.minRunIn} units: the head sits on the corner (first: ${firstStub})`, null);
+  if (tipGaps) add("arrow-gap", `${tipGaps} arrow tips stop more than ${P.maxTipGap} units from any box (first: ${firstGap})`, null);
+
+  // ---- text spilling out of the box it starts in
+  let spills = 0, firstSpill = null;
+  for (const svg of document.querySelectorAll("svg")) {
+    if (!visible(svg)) continue;
+    const rects = [...svg.querySelectorAll("rect")].map((r) => r.getBBox()).filter((b) => b.width < 200 && b.height < 300);
+    for (const tx of svg.querySelectorAll("text")) {
+      const b = tx.getBBox();
+      const home = rects.filter((r) => b.x >= r.x && b.x <= r.x + r.width && b.y + b.height / 2 >= r.y && b.y + b.height / 2 <= r.y + r.height)
+        .sort((p, q) => p.width * p.height - q.width * q.height)[0];
+      if (home && b.x + b.width > home.x + home.width + 0.5) { spills++; firstSpill = firstSpill || tx.textContent; }
+    }
+  }
+  if (spills) add("box-overflow", `${spills} diagram labels run past the right edge of their box (first: "${firstSpill}")`, null);
+
   if (crossed) add("line-through-text", `${crossed} connector segments cross diagram text (first: "${firstCross}")`, null);
 
   if (hard) add("hard-lines", `${hard} diagram lines or arrows drawn in near-black ${firstHard}; connectors must be softer than the text`, null);
+
+  // ---- measure: characters per line of running text (paragraphs, list items)
+  let longLines = 0, worst = 0, worstEl = null;
+  for (const el of document.querySelectorAll("p, li")) {
+    if (!visible(el) || el.closest("svg, table, .end, .note, .legend")) continue;
+    const txt = (el.textContent || "").replace(/\s+/g, " ").trim();
+    const lh = parseFloat(getComputedStyle(el).lineHeight);
+    if (!lh || txt.length < 40) continue;
+    const lines = Math.max(1, Math.round(el.getBoundingClientRect().height / lh));
+    if (lines < 2) continue;
+    const cpl = txt.length / lines;
+    if (cpl > P.maxMeasure) { longLines++; if (cpl > worst) { worst = cpl; worstEl = el; } }
+  }
+  if (longLines) add("measure", `${longLines} paragraphs run longer than ${P.maxMeasure} characters per line (worst ${Math.round(worst)})`, worstEl);
 
   // ---- radii
   const radii = new Set(framed.map((el) => getComputedStyle(el).borderTopLeftRadius));

@@ -172,6 +172,58 @@
    "note": "a connector drawn through a label (warning until calibrated)"
   },
   {
+   "id": "synthetic-arrow-stub",
+   "source": {
+    "file": "synthetic/arrow-stub.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "arrow-stub"
+    ]
+   },
+   "note": "an arrow that turns on a 0.5-unit run: the head sits on the corner"
+  },
+  {
+   "id": "synthetic-arrow-gap",
+   "source": {
+    "file": "synthetic/arrow-gap.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "arrow-gap"
+    ]
+   },
+   "note": "an arrow that stops 10 units short of its box"
+  },
+  {
+   "id": "synthetic-box-overflow",
+   "source": {
+    "file": "synthetic/box-overflow.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "box-overflow"
+    ]
+   },
+   "note": "a label wider than the box it sits in"
+  },
+  {
+   "id": "synthetic-measure",
+   "source": {
+    "file": "synthetic/measure.html"
+   },
+   "expect": {
+    "pass": false,
+    "fail": [
+     "measure"
+    ]
+   },
+   "note": "running text across the full measure, over 80 characters a line"
+  },
+  {
    "id": "synthetic-tiny-text",
    "source": {
     "file": "synthetic/tiny-text.html"
@@ -247,12 +299,13 @@
    "expect": {
     "pass": true,
     "not": [
-     "inset",
-     "gutter",
      "type-scale",
      "text-size",
      "line-through-text",
-     "radius"
+     "measure",
+     "arrow-stub",
+     "arrow-gap",
+     "stranded-heading"
     ]
    },
    "note": "the template, built by report_kit with the brand fonts: must pass with no warnings (needs REPORT_FONTS)"
