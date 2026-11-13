@@ -187,6 +187,9 @@ class Swimlane:
         return tl, dl, bl, box_h, total
 
     def row_heights(self):
+        return self.keep_drops(self.base_rows())
+
+    def base_rows(self):
         s = self.s
         rows = [28.0] * len(s["steps"])
         for nid, row, lane, title, detail, brk in s["nodes"]:
@@ -200,9 +203,29 @@ class Swimlane:
             rows[r] = max(rows[r], len(wrap_px(name, self.STEP_W - 8, LABEL_PX, 600)) * 11 + (20 if r in votes else 8))
         return rows
 
+    def keep_drops(self, rows):
+        """Two boxes joined by a straight drop between neighbouring rows are centred in their rows, so the
+        gap between them is the sum of the two slacks. Grow the lower row until that gap is at least
+        MIN_DROP, so the arrow has a visible run-in. Takes the final (possibly shared) row heights."""
+        rows = list(rows)
+        where = {}
+        for n in self.s["nodes"]:
+            m = self.node_metrics(n[3], n[4], n[5], n[0])
+            where[n[0]] = (n[1], n[2], m[4], m[3])  # row, lane, box plus note, box alone
+        for a, b in self.s["edges"]:
+            (ra, la, ta, ha), (rb, lb, tb, _) = where[a], where[b]
+            if la == lb and rb == ra + 1 and a not in self.below and b not in self.below:
+                gap = (rows[ra] - ta) / 2 + (ta - ha) + (rows[rb] - tb) / 2  # source box bottom to target box top
+                if gap < self.MIN_DROP:
+                    rows[rb] += 2 * (self.MIN_DROP - gap)
+        return rows
+
     @staticmethod
     def shared_rows(*lanes):
-        return [max(col) for col in zip(*(l.row_heights() for l in lanes))]
+        rows = [max(col) for col in zip(*(l.base_rows() for l in lanes))]
+        for l in lanes:
+            rows = [max(a, b) for a, b in zip(rows, l.keep_drops(rows))]
+        return rows
 
     def svg(self, kind, rows=None):
         s, W, GAP, HEAD_H = self.s, self.W, self.GAP, self.HEAD_H
@@ -279,6 +302,7 @@ class Swimlane:
         lo_x, hi_x, lo_y, hi_y = min(x1, x2), max(x1, x2), min(y1, y2), max(y1, y2)
         return any(lo_x < rx + rw and hi_x > rx and lo_y < ry + rh and hi_y > ry for rx, ry, rw, rh in rects)
 
+    MIN_DROP = 5.5  # least gap between two boxes joined by a straight drop: tip offset 1.5 plus a run above the 3.5-unit stub limit
     RUN_IN = 9  # the last straight run into a box: room for the arrowhead plus a visible line
 
     @classmethod
