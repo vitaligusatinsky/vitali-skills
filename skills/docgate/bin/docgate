@@ -117,6 +117,9 @@ PAGE_MARGINS_JS = """() => {
 
 
 
+_SHARED = {"browser": None, "pw": None}  # set by do_test: one Chromium reused across fixtures
+
+
 def render_pdf(src, out_pdf, profile):
     try:
         from playwright.sync_api import sync_playwright
@@ -124,10 +127,18 @@ def render_pdf(src, out_pdf, profile):
         raise SystemExit("docgate: python playwright is not installed (pip install playwright==%s && playwright install chromium)" % PINNED_PLAYWRIGHT)
     page_w_mm = profile["page"]["width_pt"] / MM
     js = PREFLIGHT_JS.read_text()
+    if _SHARED["browser"] is not None:
+        return _render_in(_SHARED["browser"], src, out_pdf, profile, js, page_w_mm, close_browser=False)
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        return _render_in(p.chromium.launch(), src, out_pdf, profile, js, page_w_mm, close_browser=True)
+
+
+def _render_in(browser, src, out_pdf, profile, js, page_w_mm, close_browser):
+    ctx = None
+    if True:
         try:
-            page = browser.new_page(viewport={"width": 658, "height": 1123})
+            ctx = browser.new_context(viewport={"width": 658, "height": 1123})
+            page = ctx.new_page()
             failed = []
             page.on("requestfailed", lambda r: failed.append(r.url))
             page.goto(Path(src).resolve().as_uri(), wait_until="load")
@@ -143,7 +154,13 @@ def render_pdf(src, out_pdf, profile):
             page.pdf(path=str(out_pdf), prefer_css_page_size=True, print_background=True)
             return pre, browser.version, failed
         finally:
-            browser.close()
+            if ctx is not None:
+                try:
+                    ctx.close()
+                except Exception:
+                    pass
+            if close_browser:
+                browser.close()
 
 
 # ----------------------------------------------------------------------------- PDF checks
@@ -436,6 +453,21 @@ def materialise(entry, base, workdir):
 def do_test(manifests, only=None, verbose=False):
     rows, ok_all = [], True
     work = Path(tempfile.mkdtemp(prefix="docgate-test-"))
+    from playwright.sync_api import sync_playwright
+    _SHARED["pw"] = sync_playwright().start()
+    _SHARED["browser"] = _SHARED["pw"].chromium.launch()
+    try:
+        return _do_test(manifests, only, verbose, rows, ok_all, work)
+    finally:
+        try:
+            _SHARED["browser"].close()
+        except Exception:
+            pass
+        _SHARED["browser"] = None
+        _SHARED["pw"].stop()
+
+
+def _do_test(manifests, only, verbose, rows, ok_all, work):
     for mpath in manifests:
         mpath = Path(os.path.expanduser(mpath)).resolve()
         manifest = json.loads(mpath.read_text())
@@ -449,6 +481,8 @@ def do_test(manifests, only=None, verbose=False):
             except Exception as exc:  # a crash in one fixture is a failed fixture, not a dead run
                 rows.append((e["id"], False, f"could not run: {exc}", ""))
                 ok_all = False
+                if not _SHARED["browser"].is_connected():  # the browser died: start a fresh one for the rest
+                    _SHARED["browser"] = _SHARED["pw"].chromium.launch()
                 continue
             fails = {r["rule"] for r in rec["results"] if r["level"] == "fail"}
             seen = {r["rule"] for r in rec["results"]}
