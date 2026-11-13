@@ -50,8 +50,8 @@ def doc(body, extra_css="", head="", fonts="Helvetica, Georgia"):
 
 
 def full_pages(n):
-    """n pages that each fill to the bottom: panels of prose until the page breaks."""
-    return "".join(f"<h2>Section {i + 1}</h2>" + "".join(f'<div class="panel"><h3>Item {i + 1}.{k + 1}</h3>{para(2)}</div>' for k in range(5)) for i in range(n))
+    """n pages that each fill most of the page: three panels of prose (the 52ch measure makes a panel about a quarter page)."""
+    return "".join(f"<h2>Section {i + 1}</h2>" + "".join(f'<div class="panel"><h3>Item {i + 1}.{k + 1}</h3>{para(2)}</div>' for k in range(3)) for i in range(n))
 
 
 SOFT_DIAGRAM = """<svg viewBox="0 0 400 140" width="100%" xmlns="http://www.w3.org/2000/svg">
@@ -100,7 +100,7 @@ FIXTURES = {
                    {"pass": False, "fail": ["arrow-stub"]}, "an arrow that turns on a 0.5-unit run: the head sits on the corner"),
     "arrow-gap": (doc("<h1>Heading</h1>" + SOFT_DIAGRAM.replace('d="M100,60 V70 H160 V78.5"', 'd="M100,60 V65 H160 V70"') + para(1)),
                   {"pass": False, "fail": ["arrow-gap"]}, "an arrow that stops 10 units short of its box"),
-    "box-overflow": (doc("<h1>Heading</h1>" + SOFT_DIAGRAM.replace(">Offer<", ">Offer automatically<") + para(1)),
+    "box-overflow": (doc("<h1>Heading</h1>" + SOFT_DIAGRAM.replace(">Offer<", ">Offer is confirmed and passed on automatically<") + para(1)),
                      {"pass": False, "fail": ["box-overflow"]}, "a label wider than the box it sits in"),
     "measure": (doc("<h1>Heading</h1><p style='max-width:none'>" + PARA * 3 + "</p>"),
                 {"pass": False, "fail": ["measure"]}, "running text across the full measure, over 80 characters a line"),
@@ -111,8 +111,8 @@ FIXTURES = {
                      {"pass": False, "fail": ["fonts"]}, "a webfont that never loads: the fallback prints instead"),
     "interrupted": ((lambda h: h[:h.index("{steps}") + len("{steps}")])(doc("<h1>Heading</h1>" + para(2) + "<section>{steps}</section>")),
                     {"pass": False, "fail": ["truncated", "placeholder"]}, "a build that stopped half-way: no closing tags, a template hole"),
-    "stranded-heading": (doc("<h1>Heading</h1>" + "".join(f'<div class="panel"><h3>Item {k}</h3>{para(2)}</div>' for k in range(4))
-                             + "<div style='height:150px'></div><h2 style='break-after:auto'>A section that starts too late</h2><p>One line of lead.</p>"
+    "stranded-heading": (doc("<h1>Heading</h1>" + "".join(f'<div class="panel"><h3>Item {k}</h3>{para(2)}</div>' for k in range(6))
+                             + "<div style='height:60px'></div><h2 style='break-after:auto'>A section that starts too late</h2><p>One line of lead.</p>"
                              + "<div class='panel'><h3>Tall block</h3>" + para(5) + "</div>" + full_pages(1)),
                          {"pass": False, "fail": ["stranded-heading"]}, "a heading and one line left at the foot of a page"),
     "waived": (doc("<h1>Heading</h1>" + full_pages(1) + "<p class='page'>A deliberate closing line on its own page.</p>",
