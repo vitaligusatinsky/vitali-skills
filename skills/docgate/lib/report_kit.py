@@ -31,7 +31,7 @@ BODY_PX = 8.8 * PT         # 11.73 px: the body step
 
 INK, INK2, MUTED, ACCENT, WARN, WARN_DOT = "#1C171B", "#3D3147", "#6D5A7D", "#473855", "#9A3412", "#C2410C"
 LINE, BOX = "#6D5A7D", "#3D3147"  # connectors and box outlines: softer than ink
-LANE_TINT, SYS_TINT = "#F6F4F0", "#F1E6EC"
+LANE_TINT, SYS_TINT = "#F0EAE3", "#F1E6EC"  # >= 0.06 OKLab L off white (faint-frame)
 
 
 # ----------------------------------------------------------------------------- page assembly

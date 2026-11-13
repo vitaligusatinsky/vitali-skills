@@ -576,6 +576,51 @@ def do_pair(a, b, outdir, dpi=100, labels=("before", "after")):
     return 0
 
 
+# ----------------------------------------------------------------------------- gallery command
+def do_gallery(outdir, profile_name="a4-report"):
+    """Render every component alone in each state (assets/gallery.py) and gate each one.
+    A component may be used in a deliverable only while all its states pass."""
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    html, pdf = outdir / "gallery.html", outdir / "gallery.pdf"
+    code, out, err = run([sys.executable, str(HERE / "assets" / "gallery.py"), str(html)])
+    if code:
+        print(f"docgate gallery: build failed: {err.strip()[-400:]}")
+        return 2
+    rec = do_render(html, pdf, profile_name, tiles=outdir / "tiles", quiet=True)
+    owner = {}  # page -> (component, state), from the caption line on each state's first page
+    cur = None
+    for n in range(1, rec["page_count"] + 1):
+        _, txt, _ = run(["pdftotext", "-f", str(n), "-l", str(n), "-layout", str(pdf), "-"])
+        m = re.search(r"GALLERY (\S+) · ([^\n]+)", txt)
+        if m:
+            cur = (m.group(1).lower(), m.group(2).strip().lower())
+        owner[n] = cur
+    rows = {}
+    for c, s in owner.values():
+        rows.setdefault((c, s), [])
+    doc_level = []
+    for r in rec["results"]:
+        if r["level"] not in ("fail", "warn"):
+            continue
+        pm = re.search(r"page (\d+)", r["where"] or "")
+        if pm and owner.get(int(pm.group(1))):
+            rows[owner[int(pm.group(1))]].append(r)
+        else:
+            doc_level.append(r)
+    bad = 0
+    print(f"docgate gallery  {pdf}")
+    for (c, s), rs in rows.items():
+        fails = sorted({r["rule"] for r in rs if r["level"] == "fail"})
+        warns = sorted({r["rule"] for r in rs if r["level"] == "warn"})
+        bad += bool(fails)
+        print(f"  {'FAIL' if fails else 'ok  '}  {c:10} {s:20} {' '.join(fails)}" + (f"  (warn: {' '.join(warns)})" if warns else ""))
+    for r in doc_level:
+        print(f"  {r['level'].upper():5} (whole gallery) {r['rule']}: {r['msg'][:110]}")
+    print(f"  {len(rows) - bad}/{len(rows)} component states pass. Tiles: {outdir / 'tiles'}")
+    return 1 if bad else 0
+
+
 # ----------------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser(prog="docgate", description=__doc__.split("\n\n")[0])
@@ -602,6 +647,10 @@ def main():
     q.add_argument("pdf")
     q.add_argument("--pages")
     q.add_argument("-v", "--verbose", action="store_true")
+    pl = sub.add_parser("plan", help="gate a layout plan (grid, type and gap scales, measure, frames, references) before building")
+    pl.add_argument("plan")
+    g = sub.add_parser("gallery", help="render every report_kit component alone in each state and gate each one")
+    g.add_argument("--out", default=str(Path(tempfile.gettempdir()) / "docgate-gallery"))
     sub.add_parser("version")
     a = ap.parse_args()
     if a.cmd == "pair":
@@ -613,6 +662,12 @@ def main():
         return do_check(a.pdf)
     if a.cmd == "test":
         return do_test(a.manifest or [str(DEFAULT_MANIFEST)], a.only, a.verbose)
+    if a.cmd == "plan":
+        sys.path.insert(0, str(HERE / "lib"))
+        import plan as plan_mod
+        return plan_mod.run(a.plan)
+    if a.cmd == "gallery":
+        return do_gallery(a.out)
     if a.cmd == "quality":
         sys.path.insert(0, str(HERE / "lib"))
         import quality

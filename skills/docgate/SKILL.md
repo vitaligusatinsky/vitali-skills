@@ -24,6 +24,9 @@ docgate render in.html out.pdf [--profile a4-report] [--tiles DIR]   # the only 
 docgate check out.pdf                       # does the receipt match this exact PDF, and did it pass?
 docgate pair golden.pdf out.pdf DIR         # matched page pairs side by side (golden compare, before/after)
 docgate test [--manifest FILE ...]          # fixtures: rejected versions fail on their own classes, approved pass
+docgate quality any.pdf [-v]                # harness v2 quality rules on any PDF (e.g. a reference report), no receipt
+docgate gallery [--out DIR]                 # every component alone in each state, gated per state
+docgate plan my.plan.json                   # gate a layout plan before building
 ```
 
 `render` exits 0 on pass, 1 on blocking findings, 2 if it could not run. It writes
@@ -91,6 +94,34 @@ All lengths are in body-line pitches, so pages at any size compare.
 Measured and not used, because references do the same: overall ink density, gap above vs below
 headings, distinct left edges, narrow body columns under 40 characters (103 of 269 reference
 pages), widows. A rule may block only if no reference page trips it.
+
+## Three levels: plan, component, document
+
+The same bands gate a document at every level. Each level fails before the next is built.
+
+1. **Plan:** `docgate plan my.plan.json`.
+   - Before any layout, state the system:
+     - page and grid
+     - type sizes and leading
+     - gap scale in body lines
+     - measure band per text span
+     - frame tints and nesting depth
+     - one best-in-class reference per page type, with what it takes from it
+   - It fails on:
+     - more than 5 sizes or steps under 1.2×
+     - more than 4 gap sizes or gaps under 1.5× apart
+     - spans outside their measure band
+     - nesting, or tints under 0.05 OKLab L
+     - a page type with no reference
+   - Examples are in `assets/plans/`. `report-base-v1.plan.json` is the rejected system, with 9 blocking
+     findings. `phase-spread.plan.json` passes.
+2. **Component:** `docgate gallery [--out DIR]`.
+   - It renders every component (`assets/gallery.py`) alone, in each of its states, one per page, and
+     gates each state. Components: findings, feature, road, table, phase, swimlane, bar chart.
+   - A component may be used in a deliverable only while all its states pass.
+   - Add a state for every new component or variant.
+3. **Document:** `docgate render`, which applies all the rules above. Then `doc-critic`, as an
+   advisor that is not the gate.
 
 ## Calibration, harness v2 (14.11.2026)
 
