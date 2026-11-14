@@ -21,17 +21,27 @@ to call the document done until they pass. What cannot be measured goes to `doc-
 
 ```bash
 docgate render in.html out.pdf [--profile a4-report] [--tiles DIR]   # the only way to make a deliverable PDF
+docgate render in.html scratch.pdf --pages 10-12   # iteration: page rules, images, quality on those pages only; receipt is PARTIAL and never passes
+docgate render ... --bands                  # also three band tiles per page (off by default)
+docgate sheet DIR-or-pdf --pages 9-14 --out s.png   # contact sheet, 6 pages per 1560 px image: layout and rhythm across pages
 docgate check out.pdf                       # does the receipt match this exact PDF, and did it pass?
 docgate pair golden.pdf out.pdf DIR         # matched page pairs side by side (golden compare, before/after)
 docgate test [--manifest FILE ...]          # fixtures: rejected versions fail on their own classes, approved pass
-docgate quality any.pdf [-v]                # harness v2 quality rules on any PDF (e.g. a reference report), no receipt
+docgate quality any.pdf [--pages 3,10-12] [-v] [--explain]   # harness v2 quality rules on any PDF, no receipt;
+                                            # --explain lists the lines and gaps behind each finding (gap-levels: every gap with its two lines)
 docgate gallery [--out DIR]                 # every component alone in each state, gated per state
 docgate plan my.plan.json                   # gate a layout plan before building
 ```
 
 `render` exits 0 on pass, 1 on blocking findings, 2 if it could not run. It writes
 `out.pdf.docgate.json` (sha256, profile, tool versions, every finding, page metrics, waivers,
-tile paths) and page images plus three bands per page at 150 dpi for self-review.
+stage timings) and a 150 dpi image per page for self-review (`--bands` adds three bands per page).
+Quality analysis and rasterising run in parallel across pages.
+
+The fast loop: iterate with `--pages` on the pages you changed to a scratch PDF (about a
+quarter of a full render), look at them with `sheet`, diagnose with `quality --explain`, then
+finish with one full `render` of the deliverable path. A `--pages` receipt has `partial: true`
+and a blocking `partial` finding, so the Stop hook and `doc-critic` never accept it.
 
 On macOS, Chromium cannot launch inside the Claude Code sandbox (Mach port denied): run
 `render` and `test` outside it.
@@ -42,8 +52,8 @@ On macOS, Chromium cannot launch inside the Claude Code sandbox (Mach port denie
 2. Copy `assets/build_report.example.py`, keep its shape, replace the content. It fills
    `assets/report-template.html` through `lib/report_kit.py`, which prepends the brand fonts
    (`REPORT_FONTS`, licensed, never in this repo), the page footer and `report-base.css`.
-3. `docgate render`, fix what it blocks, read the tiles, compare with the golden reference.
-4. Run `doc-critic` (installed to `~/.claude/agents/`), mark each finding fixed or waived.
+3. `docgate render` (iterate with `--pages`), fix what it blocks, read the page images or a `sheet`, compare with the golden reference; one full render at the end.
+4. Make the final full render with `--bands` (the critic reads them), then run `doc-critic` (installed to `~/.claude/agents/`), mark each finding fixed or waived.
 5. Hand off with the receipt summary and the critic table.
 
 Rules, the loop and the rejection protocol: `~/.claude/rules-library/document-design.md`.

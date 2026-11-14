@@ -13,10 +13,14 @@ All lengths are expressed in relative units so pages at any size compare:
 """
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import tempfile
 import xml.etree.ElementTree as ET
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -136,7 +140,7 @@ def _ink_extent(lum, ln: Line, ground):
     return y0 + best[0], y0 + best[-1] + 1
 
 
-def _frames(full, lines, body_px):
+def _frames(full, lines, body_px, ground=None):
     """Flat light-coloured rectangles (tint panels, cards) and how they nest.
 
     Found at half resolution: a colour mask is closed with a kernel just larger than a
@@ -208,7 +212,7 @@ def _frames(full, lines, body_px):
                 if best < 0 or g.area < frames[best].area:
                     best = j
         f.parent = best
-    ground = _page_ground(full)
+    ground = ground if ground is not None else _page_ground(full)
     for f in frames:
         d, p = 1, f.parent
         while p >= 0:
@@ -220,9 +224,11 @@ def _frames(full, lines, body_px):
 
 
 def _page_ground(img):
-    q = (img[::4, ::4] // 4).reshape(-1, 3)
-    vals, counts = np.unique(q, axis=0, return_counts=True)
-    return tuple(int(t) for t in vals[np.argmax(counts)] * 4 + 2)
+    # one packed integer per pixel: np.unique on rows sorts the same way but is ~10x slower
+    q = (img[::4, ::4] // 4).reshape(-1, 3).astype(np.int32)
+    vals, counts = np.unique((q[:, 0] << 16) | (q[:, 1] << 8) | q[:, 2], return_counts=True)
+    v = int(vals[np.argmax(counts)])
+    return tuple(int(t) * 4 + 2 for t in ((v >> 16) & 255, (v >> 8) & 255, v & 255))
 
 
 def _weighted_median(vals, weights):
@@ -237,7 +243,8 @@ def analyze_page(pdf: Path, page: int) -> PageReport:
     H, W = img.shape[:2]
     lum = _oklab_L(img)
     lines = text_lines(pdf, page)
-    gL = float(_oklab_L(np.array(_page_ground(img))))
+    ground = _page_ground(img)
+    gL = float(_oklab_L(np.array(ground)))
     for ln in lines:
         ln.iy0, ln.iy1 = _ink_extent(lum, ln, min(gL, float(np.median(
             lum[max(0, int(ln.y0)):int(ln.y1) + 1, max(0, int(ln.x0)):int(ln.x1) + 1]) + 0.05)))
@@ -252,7 +259,7 @@ def analyze_page(pdf: Path, page: int) -> PageReport:
                 and min(a.x1, b.x1) > max(a.x0, b.x0) and 0 < b.y0 - a.y0 < 2.2 * body_h:
             pitches.append(b.y0 - a.y0)
     pitch = float(np.median(pitches)) if pitches else body_h
-    frames = _frames(img, lines, body_h)
+    frames = _frames(img, lines, body_h, ground)
     for f in frames:
         inside = [l for l in lines if f.x0 - 1 <= l.x0 and l.x1 <= f.x1 + 1
                   and f.y0 - 1 <= l.iy0 and l.iy1 <= f.y1 + 1]
@@ -389,18 +396,20 @@ def _relational(lines, frames, body_h, pitch, W, H):
     # 8. vertical rhythm: every gap between stacked lines in a column, in body pitches.
     # A gap should read either as leading (ink gap < 0.7 P) or as a break (>= 1.15 P);
     # gaps in between neither join nor separate ("no ratio between gaps", "glued").
-    vg = []
+    vg, gap_pairs = [], []
     for i, ln in enumerate(lines):
         _, below = _column_neighbours(lines, i)
         if below is not None:
             g = (below.iy0 - ln.iy1) / pitch
             if 0 < g < 8:
                 vg.append(g)
+                gap_pairs.append((g, ln.text[:40], below.text[:40], round(ln.iy1 / DPI * 25.4, 1)))
     amb = [g for g in vg if 0.7 <= g < 1.15]
     m["gaps"] = len(vg)
     m["ambiguous_gaps"] = len(amb)
     m["ambiguous_share"] = len(amb) / max(1, len(vg))
     m["gap_list"] = [round(g, 2) for g in vg]
+    m["gap_pairs"] = gap_pairs
     # gap levels: cluster the break-size gaps (>= 0.7 P); a designed page uses a few
     # levels with a clear ratio between them (e.g. 1, 2, 4 lines), not a smear.
     brk = sorted(g for g in vg if g >= 0.7)
@@ -465,13 +474,63 @@ def evaluate(r: PageReport, prof: dict = PROFILE) -> list[dict]:
     return out
 
 
-def analyze(pdf: Path, pages=None) -> list[tuple[PageReport, list]]:
-    pages = pages or range(1, page_count(pdf) + 1)
-    res = []
-    for p in pages:
-        r = analyze_page(pdf, p)
-        res.append((r, evaluate(r) if r.body_h else []))
-    return res
+def _analyze_one(args):
+    pdf, p = args
+    r = analyze_page(pdf, p)
+    return r, (evaluate(r) if r.body_h else [])
+
+
+def analyze(pdf: Path, pages=None, workers: int | None = None) -> list[tuple[PageReport, list]]:
+    """Per-page reports and findings, in page order. Pages are independent, so they run in
+    parallel processes; the numbers are the same as a serial run."""
+    pages = list(pages or range(1, page_count(pdf) + 1))
+    n = workers if workers is not None else min(8, os.cpu_count() or 1, len(pages))
+    if n <= 1 or len(pages) <= 1:
+        return [_analyze_one((pdf, p)) for p in pages]
+    try:  # fork: spawn would re-import the caller's __main__ (and re-run an unguarded script)
+        with ProcessPoolExecutor(max_workers=n, mp_context=multiprocessing.get_context("fork")) as ex:
+            return list(ex.map(_analyze_one, [(pdf, p) for p in pages]))
+    except (ValueError, BrokenProcessPool):  # no fork here, or a worker died: do it serially
+        return [_analyze_one((pdf, p)) for p in pages]
+
+
+def explain(r: PageReport, findings: list) -> list[str]:
+    """For each finding, the actual lines, gaps or frames that cause it, so the fix needs no
+    ad-hoc script. Positions are mm from the top of the page, to the foot of the upper line."""
+    out = []
+    mm = lambda px: px / DPI * 25.4
+    for f in findings:
+        rule, m = f["rule"], r.metrics
+        out.append(f"  p{r.page:02d} {rule}: {f['detail']}")
+        if rule in ("gap-levels", "gap-scale"):
+            brk = sorted((p for p in m.get("gap_pairs", []) if p[0] >= 0.7), key=lambda p: p[0])
+            levels, cur = [], []
+            for p in brk:
+                if cur and p[0] > np.mean([c[0] for c in cur]) * 1.18:
+                    levels.append(cur)
+                    cur = []
+                cur.append(p)
+            if cur:
+                levels.append(cur)
+            for lv in levels:
+                tag = f"level {np.mean([c[0] for c in lv]):.2f} P x{len(lv)}" if len(lv) >= 2 else "single (not a level)"
+                out.append(f"      {tag}")
+                for g, a, b, y in lv:
+                    out.append(f'        {g:5.2f} P  y={y:6.1f}mm  "{a}"  ->  "{b}"')
+        elif rule in ("nested-frame", "faint-frame", "frame-heavy"):
+            for fr in r.frames:
+                if not fr.lines:
+                    continue
+                if rule == "nested-frame" and fr.depth < 2:
+                    continue
+                if rule == "faint-frame" and not 0.005 <= fr.contrast < PROFILE["faintFrameDL"]:
+                    continue
+                out.append(f'      frame depth {fr.depth} dL {fr.contrast:.3f}  x={mm(fr.x0):.0f}-{mm(fr.x1):.0f}mm '
+                           f'y={mm(fr.y0):.0f}-{mm(fr.y1):.0f}mm  "{fr.lines[0].text[:40]}"')
+        elif rule == "large-narrow":
+            for n, cpl, t in m.get("large_blocks", []):
+                out.append(f'      {n} lines, {cpl} characters a line: "{t}"')
+    return out
 
 
 def page_count(pdf: Path) -> int:
@@ -491,6 +550,6 @@ if __name__ == "__main__":
             bad += f["severity"] == "fail"
             print(f"  p{r.page:02d} {f['severity'].upper():5s} {f['rule']:13s} {f['detail']}")
         if verbose:
-            mm = {k: v for k, v in r.metrics.items() if k not in ("heading_ratios", "gap_list")}
+            mm = {k: v for k, v in r.metrics.items() if k not in ("heading_ratios", "gap_list", "gap_pairs")}
             print(f"  p{r.page:02d} metrics", json.dumps(mm, ensure_ascii=False, default=str))
     sys.exit(1 if bad else 0)

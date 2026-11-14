@@ -15,9 +15,11 @@ no explanation from its builder. Judge only what is on the pages.
 ## Inputs (the brief gives the paths)
 
 1. **Receipt**: `<doc>.pdf.docgate.json`. Read `pass`, `results`, `pages`, `tiles_dir`. If
-   `pass` is false, stop and say so: docgate failures are fixed before critique.
-2. **Tiles**: `tiles_dir/page-NN.png` (whole pages) and `page-NN-tK.png` (three bands per page
-   at 150 dpi). Read every page, then the bands of any page where something looks off. Never
+   `pass` is false, or `partial` is true (a `--pages` iteration receipt), stop and say so:
+   docgate failures are fixed, and a full render made, before critique.
+2. **Tiles**: `tiles_dir/page-NN.png` (whole pages) and, when the receipt says `bands: true`, `page-NN-tK.png` (three bands per page
+   at 150 dpi). Read every page, then the bands of any page where something looks off. If the receipt
+   says `bands: false`, stop: ask for `docgate render ... --bands` first. Never
    judge type, alignment or a diagram from the whole-page image alone.
 3. **Golden reference**: the approved pages the brief names. This is the bar.
 4. **Negative examples**: rejected pages with the reason each was rejected. This is what
