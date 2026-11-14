@@ -1,0 +1,16 @@
+{
+ "name": "phase pages, round-3 direction: one 12-column grid, a 1/2/4-line rhythm, no frames in the body",
+ "page": {"width_mm": 210, "height_mm": 297, "margin_mm": [20, 20, 18, 20], "ground": "#FFFFFF"},
+ "grid": {"columns": 12, "gutter_mm": 8, "text_spans": {"body": 6, "snags": 7, "question": 8}},
+ "type": {"sizes_pt": [7, 8.8, 12, 16, 22], "body_pt": 8.8, "leading": 1.5, "avg_char_em": 0.5,
+          "text_sizes": {"question": 12}},
+ "gaps": {"lines": [0.5, 1, 2, 4]},
+ "measure": {"default": [45, 75], "snags": [45, 75], "question": [35, 65]},
+ "frames": {"max_depth": 1, "max_text_frames_per_page": 1, "tints": {"field": "#EDE6DE"}},
+ "page_types": [
+  {"name": "phase opener", "reference": "https://unosd.un.org/sites/unosd.un.org/files/ideo_field_guide_to_human-centered_design.pdf#page=80",
+   "why": "metadata as a quiet margin rail beside the block it describes; a short bar above the title"},
+  {"name": "phase reading page", "reference": "https://media.nesta.org.uk/documents/Nesta_Annual_Report_2023-24.pdf#page=7",
+   "why": "two-column body on one grid with wide margins and air above the section title"}
+ ]
+}

@@ -53,6 +53,19 @@ that reproduced it. Every new gate has to be proven by breaking the code and
 watching it go red. Triggers on `/antislop`, "audit this repo for dead code",
 "why does this alert never clear", "something broke that every check called fine".
 
+### `docgate`
+Render an HTML document to a deliverable PDF and prove it is right. A pinned Chromium
+prints it; DOM preflight and measured checks on the real PDF catch what a thumbnail hides
+(a landscape page in a portrait set, a half-empty page or an orphaned fragment, a heading
+stranded at the foot of a page, heading leading looser than its gap, divider lines and
+left-border accents, near-black arrows, diagram text too small or colliding, a fallback
+font). It writes 150 dpi tiles for review and a receipt bound to the PDF's sha256, which a
+Stop hook checks. Ships `report-base.css` (a five-step type scale), a report template, a
+builder kit with measured-glyph vertical swimlanes, per-rule fixtures with controls, and a
+`doc-critic` agent that judges only what cannot be measured and returns findings with
+dispositions. Install with `scripts/install-docgate.sh` (needs Python Playwright 1.58.0,
+Pillow, poppler).
+
 ### `grounded-analysis`
 Analysis you can trust — of meetings and mentoring sessions, ideas, plans,
 performance, and decisions. Grounds every claim in the source before asserting it,

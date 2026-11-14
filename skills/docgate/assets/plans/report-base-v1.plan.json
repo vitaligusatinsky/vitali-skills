@@ -1,0 +1,11 @@
+{
+ "name": "report-base v1 (13.11.2026), as built: the system the owner rejected",
+ "page": {"width_mm": 210, "height_mm": 297, "margin_mm": [16, 18, 16, 18], "ground": "#FFFFFF"},
+ "grid": {"columns": 2, "gutter_mm": 7, "text_spans": {"body": 1, "question": 1}},
+ "type": {"sizes_pt": [7, 8.8, 12, 16, 22], "body_pt": 8.8, "leading": 1.5, "avg_char_em": 0.5,
+          "text_sizes": {"question": 12}},
+ "gaps": {"lines": [0.25, 0.5, 0.75, 1, 1.5, 2, 3]},
+ "measure": {"default": [45, 75], "question": [30, 60]},
+ "frames": {"max_depth": 2, "max_text_frames_per_page": 3, "tints": {"tint": "#F6F4F0", "plum": "#F1E6EC", "warm": "#FBEEE7"}},
+ "page_types": [{"name": "phase", "reference": "", "why": ""}]
+}

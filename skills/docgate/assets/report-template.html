@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title}</title>
+<style>{css}</style>
+</head>
+<body>
+<!--
+  report-template.html: start every printed client report here, then build it with
+  report_kit (see build_report.example.py) and render it with `docgate render`.
+
+  Before drafting, fill in vitali-os docs/conventions/documents/client-report-standard.md.
+  Structure that the approved report used, top to bottom:
+    1. header, kicker (event, place, date), title, a short intro that says what this is for
+    2. summary panel: the findings, each a bold claim + one or two sentences, confirmed figures only
+    3. "where we are": the engagement road, the current step highlighted
+    4. what was covered (agenda table with times), source visuals from the session
+    5. the diagrams (vertical swimlanes: steps down, roles across), one per page
+    6. one tinted card per item: now and target as prose, one framed list, one question
+    7. reference tables (systems, confirmed figures, single-source items labelled)
+    8. what we need from you, and the deliverables actually bought
+  Classes come from report-base.css; never add inline font sizes, colours or margins.
+  Type scale: 22 / 16 / 12 / 8.8 / 7 pt. No divider lines, no left-border accents, no comment boxes.
+-->
+
+<div class="top">
+  <div class="me">
+    <img src="{logo}" alt="">
+    <div><div class="n">{author}</div><div class="r">{byline}</div></div>
+  </div>
+  <div class="tag">{doc_type}</div>
+</div>
+
+<div class="kicker">{kicker}</div>
+<h1>{headline}</h1>
+<p class="intro">{intro}</p>
+
+<div class="panel mt">
+  <h2>{summary_heading}</h2>
+  <ul class="findings">
+{summary_items}
+  </ul>
+</div>
+
+<h2>{road_heading}</h2>
+<div class="road">
+{road}
+</div>
+
+{sections}
+
+<div class="end">
+  <span><b>{author}</b> · {contact}</span>
+</div>
+
+</body>
+</html>
